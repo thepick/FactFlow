@@ -1730,6 +1730,7 @@
     }
 
     function requestGoogleSignIn() {
+      console.log('[FactFlow Sync] requestGoogleSignIn');
       if (!syncState.tokenClient) {
         setSyncStatus('error', 'Google sync is still loading');
         return;
@@ -1777,6 +1778,7 @@
     }
 
     function handleTokenResponse(tokenResponse) {
+      console.log('[FactFlow Sync] handleTokenResponse', { hasToken: !!tokenResponse, error: tokenResponse && tokenResponse.error });
       if (!tokenResponse || tokenResponse.error) {
         setSyncStatus('error', 'Google sign-in failed');
         return;
@@ -1792,6 +1794,11 @@
       syncState.lastError = null;
       setSyncEnabledBefore(true);
       saveTokenSession(tokenResponse);
+      console.log('[FactFlow Sync] applyTokenResponse', {
+        hasToken: !!syncState.accessToken,
+        expiresAt: new Date(syncState.tokenExpiresAt).toISOString(),
+        expiresIn: tokenResponse.expires_in
+      });
     }
 
     function isTokenValid() {
@@ -1800,7 +1807,7 @@
 
     function fetchGoogleUserInfo() {
       if (!syncState.signedIn || !syncState.accessToken) return Promise.resolve(null);
-      return googleFetch('https://www.googleapis.com/oauth2/v2/userinfo')
+      return driveFetch('https://www.googleapis.com/oauth2/v2/userinfo', { method: 'GET' })
         .then(function (response) {
           if (!response.ok) throw new Error('USERINFO_' + response.status);
           return response.json();
@@ -1813,7 +1820,7 @@
         })
         .catch(function (e) {
           syncState.lastError = e;
-          if (!syncState.googleUser) syncState.googleUser = getCachedGoogleUser() || { name: 'Connected' };
+          if (!syncState.googleUser) syncState.googleUser = getCachedGoogleUser() || { name: 'Google sync connected' };
           refreshGoogleAuthHeader();
           return null;
         });
@@ -1821,8 +1828,13 @@
 
     // ═══════════════════════════ SIGN IN / OUT ═══════════════════════════
     function onGoogleSignedIn() {
+      console.log('[FactFlow Sync] onGoogleSignedIn start', {
+        signedIn: syncState.signedIn,
+        hasToken: !!syncState.accessToken,
+        tokenExpiresAt: syncState.tokenExpiresAt ? new Date(syncState.tokenExpiresAt).toISOString() : null
+      });
       syncState.deviceId = syncState.deviceId || getDeviceId();
-      syncState.googleUser = syncState.googleUser || getCachedGoogleUser() || { name: 'Connected' };
+      syncState.googleUser = syncState.googleUser || getCachedGoogleUser() || { name: 'Loading account...' };
       setSyncStatus('syncing', 'Connecting...');
       fetchGoogleUserInfo();
       syncNow('sign-in')
@@ -1870,13 +1882,17 @@
       }
 
       if (!isTokenValid()) {
+        console.warn('[FactFlow Sync] driveFetch: token invalid or expired');
         return Promise.reject(new Error('TOKEN_EXPIRED'));
       }
 
       options.headers = options.headers || {};
       options.headers.Authorization = 'Bearer ' + syncState.accessToken;
 
+      console.log('[FactFlow Sync] driveFetch', { method: options.method || 'GET', url: url.replace(/\?.*/, '?…').substring(0, 80) });
+
       return fetch(url, options).then(function (r) {
+        console.log('[FactFlow Sync] Drive API response', { url: url.replace(/\?.*/, '?…').substring(0, 80), status: r.status, ok: r.ok });
         if (r.status === 401 || r.status === 403) {
           var err = new Error('AUTH_ERROR');
           err.status = r.status;
@@ -1893,10 +1909,13 @@
       var q = "name='" + DRIVE_FILE_NAME.replace(/'/g, "\\'") + "' and trashed=false";
       var url = DRIVE_API_BASE + '/files?spaces=appDataFolder&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc&q=' + encodeURIComponent(q);
 
+      console.log('[FactFlow Sync] findDriveFile searching appDataFolder', { fileName: DRIVE_FILE_NAME });
+
       return driveFetch(url, { method: 'GET' })
         .then(function (r) { return r.json(); })
         .then(function (data) {
           var files = data.files || [];
+          console.log('[FactFlow Sync] findDriveFile results', { fileCount: files.length, files: files.map(function(f) { return { id: f.id, name: f.name, modifiedTime: f.modifiedTime }; }) });
           if (!files.length) return null;
 
           syncState.driveFileId = files[0].id;
@@ -1949,14 +1968,22 @@
     function downloadDriveProgress(fileId) {
       if (!fileId) return Promise.resolve(null);
 
+      console.log('[FactFlow Sync] downloadDriveProgress', { fileId: fileId });
+
       return driveFetch(DRIVE_API_BASE + '/files/' + encodeURIComponent(fileId) + '?alt=media', { method: 'GET' })
         .then(function (r) {
           if (r.status === 404) {
+            console.log('[FactFlow Sync] downloadDriveProgress: file not found (404)');
             syncState.driveFileId = null;
             syncState.driveModifiedTime = null;
             return null;
           }
-          if (!r.ok) throw new Error('Drive download failed');
+          if (!r.ok) {
+            return r.text().then(function (text) {
+              console.error('[FactFlow Sync] Drive download failed', r.status, text);
+              throw new Error('Drive download failed: ' + r.status);
+            });
+          }
           return r.json();
         })
         .catch(function (e) {
@@ -1982,6 +2009,7 @@
     }
 
     function uploadDriveProgress(progress) {
+      console.log('[FactFlow Sync] uploadDriveProgress start', { hasFileId: !!syncState.driveFileId, fileId: syncState.driveFileId });
       var wrapped = wrapProgressForDrive(progress);
       var boundary = 'factflow_boundary_' + Date.now() + '_' + makeRandomSuffix();
       var metadata;
@@ -2015,7 +2043,12 @@
           syncState.driveFileId = null;
           return uploadDriveProgress(progress);
         }
-        if (!r.ok) throw new Error('Drive upload failed');
+        if (!r.ok) {
+          return r.text().then(function (text) {
+            console.error('[FactFlow Sync] Drive upload failed', r.status, text);
+            throw new Error('Drive upload failed: ' + r.status);
+          });
+        }
         return r.json();
       })
       .then(function (data) {
@@ -2287,6 +2320,7 @@
 
     // ═══════════════════════════ SYNC ORCHESTRATION ═══════════════════════════
     function syncNow(reason) {
+      console.log('[FactFlow Sync] syncNow start', { reason: reason, signedIn: syncState.signedIn, online: navigator.onLine, isSyncing: syncState.isSyncing });
       if (!syncState.signedIn) {
         setSyncStatus('local', 'Not synced');
         return Promise.resolve(false);
