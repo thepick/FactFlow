@@ -1712,19 +1712,8 @@
           setSyncStatus('syncing', 'Restoring Google sync...');
           onGoogleSignedIn();
         } else {
-          // Token not in sessionStorage (Edge cleared it, new tab, sleeping tab, etc.)
-          // Try a silent refresh first - no popup, no user interaction required.
-          setSyncStatus('syncing', 'Reconnecting to Google...');
-          requestGoogleTokenRefresh('')
-            .then(function () {
-              onGoogleSignedIn();
-            })
-            .catch(function (e) {
-              // Silent refresh failed (token truly expired, access revoked, etc.)
-              // Fall back gracefully - just ask the user to sign in again.
-              syncState.lastError = e;
-              setSyncStatus('local', 'Sign in to sync');
-            });
+          // No valid token in sessionStorage — wait for manual sign-in.
+          setSyncStatus('local', 'Sign in to sync');
         }
       }
     }
@@ -1871,7 +1860,7 @@
 
     // ═══════════════════════════ DRIVE FETCH ═══════════════════════════
     function isAuthError(e) {
-      return e && (e.status === 401 || e.status === 403 || e.message === 'TOKEN_EXPIRED' || e.message === 'NO_TOKEN');
+      return e && (e.status === 401 || e.message === 'TOKEN_EXPIRED' || e.message === 'NO_TOKEN');
     }
 
     function driveFetch(url, options) {
@@ -1893,11 +1882,6 @@
 
       return fetch(url, options).then(function (r) {
         console.log('[FactFlow Sync] Drive API response', { url: url.replace(/\?.*/, '?…').substring(0, 80), status: r.status, ok: r.ok });
-        if (r.status === 401 || r.status === 403) {
-          var err = new Error('AUTH_ERROR');
-          err.status = r.status;
-          throw err;
-        }
         return r;
       });
     }
@@ -1981,7 +1965,10 @@
           if (!r.ok) {
             return r.text().then(function (text) {
               console.error('[FactFlow Sync] Drive download failed', r.status, text);
-              throw new Error('Drive download failed: ' + r.status);
+              var err = new Error('Drive download failed: ' + r.status);
+              err.status = r.status;
+              err.responseText = text;
+              throw err;
             });
           }
           return r.json();
@@ -2046,7 +2033,10 @@
         if (!r.ok) {
           return r.text().then(function (text) {
             console.error('[FactFlow Sync] Drive upload failed', r.status, text);
-            throw new Error('Drive upload failed: ' + r.status);
+            var err = new Error('Drive upload failed: ' + r.status);
+            err.status = r.status;
+            err.responseText = text;
+            throw err;
           });
         }
         return r.json();
@@ -2388,12 +2378,14 @@
         .catch(function (e) {
           syncState.isSyncing = false;
           syncState.lastError = e;
-          if (isAuthError(e) || e.message === 'TOKEN_EXPIRED') {
+          if (e.message === 'TOKEN_EXPIRED' || e.message === 'NO_TOKEN' || e.status === 401) {
             syncState.signedIn = false;
             syncState.accessToken = null;
             syncState.tokenExpiresAt = 0;
             clearTokenSession();
             setSyncStatus('error', 'Sign in again to sync');
+          } else if (e.status === 403) {
+            setSyncStatus('error', 'Google Drive permission error');
           } else if (!navigator.onLine) {
             setSyncStatus('offline', 'Offline - will sync later');
           } else {
