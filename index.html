@@ -1800,9 +1800,7 @@
 
     function fetchGoogleUserInfo() {
       if (!syncState.signedIn || !syncState.accessToken) return Promise.resolve(null);
-      return fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-          headers: { Authorization: 'Bearer ' + syncState.accessToken }
-        })
+      return googleFetch('https://www.googleapis.com/oauth2/v2/userinfo')
         .then(function (response) {
           if (!response.ok) throw new Error('USERINFO_' + response.status);
           return response.json();
@@ -1826,11 +1824,11 @@
       syncState.deviceId = syncState.deviceId || getDeviceId();
       syncState.googleUser = syncState.googleUser || getCachedGoogleUser() || { name: 'Connected' };
       setSyncStatus('syncing', 'Connecting...');
-      fetchGoogleUserInfo().catch(function () {});
+      fetchGoogleUserInfo();
       syncNow('sign-in')
-        .then(function (ok) {
+        .then(function () {
           startSyncPolling();
-          if (ok) setSyncStatus('synced', 'Synced');
+          setSyncStatus('synced', 'Synced');
         })
         .catch(function (e) {
           syncState.lastError = e;
