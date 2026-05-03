@@ -302,7 +302,7 @@
       width: 0%;
       height: 100%;
       border-radius: inherit;
-      background: linear-gradient(90deg, #2d8cff 0%, #f2d23b 45%, #f28c28 72%, #d72626 100%);
+      background: #2d8cff;
       transition: width 180ms ease;
     }
     .streak-flame {
@@ -326,7 +326,7 @@
       width: 0%;
       height: 100%;
       border-radius: inherit;
-      background: linear-gradient(90deg, #2d8cff 0%, #f2d23b 45%, #f28c28 72%, #d72626 100%);
+      background: #2d8cff;
       transition: width 300ms ease;
     }
     .fpm-runner {
@@ -4153,12 +4153,42 @@
       if (!isTouch) node.focus();
     }
 
+    function progressiveGradient(pct) {
+      // Map fill percentage to a progressive 4-color gradient.
+      // Colors reveal sequentially: blue -> yellow -> orange -> red
+      var C = ['#2d8cff', '#f2d23b', '#f28c28', '#d72626'];
+      if (pct <= 0) return 'none';
+      if (pct >= 100) return 'linear-gradient(90deg,' + C[0] + ' 0%,' + C[1] + ' 25%,' + C[2] + ' 50%,' + C[3] + ' 75%)';
+
+      if (pct <= 25) {
+        return 'linear-gradient(90deg,' + C[0] + ',' + C[0] + ')';
+      }
+      if (pct <= 50) {
+        var t = (pct - 25) / 25;
+        if (t < 0.04) return 'linear-gradient(90deg,' + C[0] + ',' + C[0] + ')';
+        var s = (t * 100).toFixed(0);
+        return 'linear-gradient(90deg,' + C[0] + ' 0%,' + C[1] + ' ' + s + '%,' + C[1] + ' 100%)';
+      }
+      if (pct <= 75) {
+        var t = (pct - 50) / 25;
+        if (t < 0.04) return 'linear-gradient(90deg,' + C[0] + ' 0%,' + C[1] + ' 50%,' + C[1] + ' 100%)';
+        var s = (50 + t * 50).toFixed(0);
+        return 'linear-gradient(90deg,' + C[0] + ' 0%,' + C[1] + ' 50%,' + C[2] + ' ' + s + '%,' + C[2] + ' 100%)';
+      }
+      var t = (pct - 75) / 25;
+      if (t < 0.04) return 'linear-gradient(90deg,' + C[0] + ' 0%,' + C[1] + ' 33%,' + C[2] + ' 66%,' + C[2] + ' 100%)';
+      var s = (66 + t * 34).toFixed(0);
+      return 'linear-gradient(90deg,' + C[0] + ' 0%,' + C[1] + ' 33%,' + C[2] + ' 66%,' + C[3] + ' ' + s + '%,' + C[3] + ' 100%)';
+    }
+
     function updateStreakMeter(streak) {
       if (!el.streakFill || !el.streakFlame) return;
       var rawStreak = streak || 0;
       if (el.currentStreakValue) el.currentStreakValue.textContent = String(rawStreak);
       var value = clamp(rawStreak, 0, 20);
-      el.streakFill.style.width = String((value / 20) * 100) + '%';
+      var pct = (value / 20) * 100;
+      el.streakFill.style.width = pct.toFixed(1) + '%';
+      el.streakFill.style.background = progressiveGradient(pct);
       el.streakFlame.classList.toggle('hot', value >= 20);
     }
 
@@ -4167,6 +4197,7 @@
       var target = Math.max(1, Number(SPEED_FULL_BAR_FPM) || 30);
       var pct = Math.max(0, Math.min(100, (fpm / target) * 100));
       el.fpmFill.style.width = pct.toFixed(1) + '%';
+      el.fpmFill.style.background = progressiveGradient(pct);
       el.fpmRunner.classList.toggle('fast', pct >= 100);
     }
 
