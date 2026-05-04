@@ -994,6 +994,55 @@
   }
   .graph-dot-hit { cursor: pointer; }
 
+  /* Visible pre-round countdown */
+  .play-panel { position: relative; overflow: hidden; }
+  .round-countdown-overlay {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 80;
+    place-items: center;
+    pointer-events: none;
+    background: color-mix(in srgb, var(--color-surface) 72%, transparent);
+    backdrop-filter: blur(2px);
+  }
+  .round-countdown-overlay.active {
+    display: grid;
+  }
+  .round-countdown-card {
+    min-width: 150px;
+    padding: 1rem 1.35rem;
+    text-align: center;
+    border-radius: var(--radius-xl);
+    background: var(--color-surface-2);
+    border: 2px solid color-mix(in srgb, var(--color-primary) 45%, transparent);
+    box-shadow: var(--shadow-md);
+  }
+  .round-countdown-label {
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 800;
+  }
+  .round-countdown-number {
+    margin-top: 0.25rem;
+    font-size: clamp(3rem, 14vw, 5.5rem);
+    line-height: 1;
+    font-weight: 900;
+    color: var(--color-primary);
+    letter-spacing: -0.06em;
+    animation: countdownPop 300ms ease;
+  }
+  .round-countdown-number.bump {
+    animation: none;
+  }
+  @keyframes countdownPop {
+    0% { transform: scale(0.78); opacity: 0; }
+    70% { transform: scale(1.08); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
   /* Score information modal */
   .info-overlay {
     position: fixed;
@@ -1366,8 +1415,14 @@
             </div>
           </div>
 
-          <div class="panel">
-            <div class="problem-area" aria-live="polite">
+          <div class="panel play-panel" id="playPanel">
+            <div class="round-countdown-overlay" id="roundCountdownOverlay" aria-live="assertive" aria-hidden="true">
+              <div class="round-countdown-card">
+                <div class="round-countdown-label" id="roundCountdownLabel">Get ready</div>
+                <div class="round-countdown-number" id="roundCountdownValue">3</div>
+              </div>
+            </div>
+            <div class="problem-area" id="problemArea" aria-live="polite">
               <div class="new-fact-label" id="newFactLabel"></div>
               <div class="problem-text" id="problemText">Ready?</div>
             </div>
@@ -1580,6 +1635,8 @@
 
     var graphShowAllResults = false; // Toggle: show all saved quiz results instead of only recent results
     var startBtnCooldown = null; // Post-round delay interval
+    var roundStartCountdownTimer = null; // Visible countdown before each round begins
+    var roundStartCountdownActive = false;
     var practiceRenderTimer = null; // Defers non-critical grid/graph redraws so the next fact appears immediately
 
     // Google Drive sync state.
@@ -1662,6 +1719,11 @@
       el.scoreInfoCloseBtn = document.getElementById('scoreInfoCloseBtn');
       el.scoreInfoDoneBtn = document.getElementById('scoreInfoDoneBtn');
       el.levelupToast = document.getElementById('levelupToast');
+      el.playPanel = document.getElementById('playPanel');
+      el.problemArea = document.getElementById('problemArea');
+      el.roundCountdownOverlay = document.getElementById('roundCountdownOverlay');
+      el.roundCountdownLabel = document.getElementById('roundCountdownLabel');
+      el.roundCountdownValue = document.getElementById('roundCountdownValue');
       el.problemText = document.getElementById('problemText');
       el.newFactLabel = document.getElementById('newFactLabel');
       el.answerInput = document.getElementById('answerInput');
@@ -2205,6 +2267,8 @@
     // ═══════════════════════════ PRACTICE LOCK ═══════════════════════════
     function setPracticeLocked(locked, message) {
       var text = message || '';
+
+      if (locked) clearRoundStartCountdown();
 
       if (el.startBtn) {
         el.startBtn.disabled = !!locked;
@@ -3988,6 +4052,36 @@
     }
 
     // ═══════════════════════════ CONFETTI ═══════════════════════════
+    function getPlayAreaConfettiOrigins() {
+      var playRect;
+      var problemRect;
+      var sourceInset;
+      var yPx;
+
+      if (!el.playPanel || !el.playPanel.getBoundingClientRect) {
+        return {
+          left: { x: 0.06, y: 0.82 },
+          right: { x: 0.94, y: 0.82 }
+        };
+      }
+
+      playRect = el.playPanel.getBoundingClientRect();
+      problemRect = (el.problemArea && el.problemArea.getBoundingClientRect) ? el.problemArea.getBoundingClientRect() : playRect;
+      sourceInset = Math.min(Math.max(playRect.width * 0.16, 42), 120);
+      yPx = problemRect.top + (problemRect.height * 0.68);
+
+      return {
+        left: {
+          x: clamp((playRect.left + sourceInset) / Math.max(1, window.innerWidth), 0.02, 0.98),
+          y: clamp(yPx / Math.max(1, window.innerHeight), 0.06, 0.94)
+        },
+        right: {
+          x: clamp((playRect.right - sourceInset) / Math.max(1, window.innerWidth), 0.02, 0.98),
+          y: clamp(yPx / Math.max(1, window.innerHeight), 0.06, 0.94)
+        }
+      };
+    }
+
     function launchConfettiOnce(colors) {
       var confettiColors;
       var duration;
@@ -4022,23 +4116,25 @@
       endAt = Date.now() + duration;
 
       function fireSideConfetti() {
+        var origins = getPlayAreaConfettiOrigins();
+
         confetti({
           particleCount: 36,
-          angle: 60,
+          angle: 55,
           spread: 68,
           startVelocity: 42,
           ticks: 95,
-          origin: { x: 0.06, y: 0.82 },
+          origin: origins.left,
           colors: confettiColors
         });
 
         confetti({
           particleCount: 36,
-          angle: 120,
+          angle: 125,
           spread: 68,
           startVelocity: 42,
           ticks: 95,
-          origin: { x: 0.94, y: 0.82 },
+          origin: origins.right,
           colors: confettiColors
         });
       }
@@ -4300,13 +4396,75 @@
     }
 
     // ═══════════════════════════ ROUND MANAGEMENT ═══════════════════════════
+    function showRoundStartCountdown(value, label) {
+      if (el.roundCountdownValue) {
+        el.roundCountdownValue.textContent = String(value);
+        el.roundCountdownValue.classList.add('bump');
+        void el.roundCountdownValue.offsetWidth;
+        el.roundCountdownValue.classList.remove('bump');
+      }
+      if (el.roundCountdownLabel) {
+        el.roundCountdownLabel.textContent = label || 'Get ready';
+      }
+      if (el.roundCountdownOverlay) {
+        el.roundCountdownOverlay.classList.add('active');
+        el.roundCountdownOverlay.setAttribute('aria-hidden', 'false');
+      }
+    }
+
+    function clearRoundStartCountdown() {
+      if (roundStartCountdownTimer) {
+        clearInterval(roundStartCountdownTimer);
+        roundStartCountdownTimer = null;
+      }
+      roundStartCountdownActive = false;
+      document.body.classList.remove('round-countdown-active');
+      if (el.roundCountdownOverlay) {
+        el.roundCountdownOverlay.classList.remove('active');
+        el.roundCountdownOverlay.setAttribute('aria-hidden', 'true');
+      }
+    }
+
+    function runRoundStartCountdown(onDone) {
+      var remaining = 3;
+
+      if (roundStartCountdownActive || round) return;
+      roundStartCountdownActive = true;
+      document.body.classList.add('round-countdown-active');
+      if (el.startBtn) el.startBtn.disabled = true;
+      if (el.answerInput) el.answerInput.disabled = true;
+      if (el.timeoutInput) el.timeoutInput.disabled = true;
+      if (el.mobileCornerTimer) { el.mobileCornerTimer.textContent = ''; el.mobileCornerTimer.classList.remove('danger', 'warn'); }
+      setRoundPill('Starting');
+      setStatus(el.roundStatus, 'Get ready...', 'warn');
+      showRoundStartCountdown(remaining, 'Get ready');
+
+      roundStartCountdownTimer = setInterval(function () {
+        remaining--;
+        if (remaining > 0) {
+          showRoundStartCountdown(remaining, 'Get ready');
+          return;
+        }
+        if (remaining === 0) {
+          showRoundStartCountdown('Go!', 'Start');
+          return;
+        }
+
+        clearRoundStartCountdown();
+        if (el.startBtn) el.startBtn.disabled = false;
+        onDone();
+      }, 1000);
+    }
+
     function startRound() {
+      if (roundStartCountdownActive) return;
       if (!isPracticeAllowed()) {
         setPracticeLocked(true, 'Sign in with Google to start.');
         setSyncStatus('local', 'Sign in to start');
         return;
       }
       if (syncState.signedIn && navigator.onLine && nowMs() - syncState.lastPullAt > SYNC_BEFORE_ROUND_MAX_AGE_MS) {
+        setStatus(el.roundStatus, 'Syncing progress before the round...', 'warn');
         syncNow('before-round').then(function () {
           if (!isPracticeAllowed()) {
             setPracticeLocked(true, 'Sign in with Google to start.');
@@ -4330,6 +4488,15 @@
     }
 
     function startRoundNow() {
+      if (!isPracticeAllowed()) {
+        setPracticeLocked(true, 'Sign in with Google to start.');
+        setSyncStatus('local', 'Sign in to start');
+        return;
+      }
+      runRoundStartCountdown(beginRoundNow);
+    }
+
+    function beginRoundNow() {
       if (!isPracticeAllowed()) {
         setPracticeLocked(true, 'Sign in with Google to start.');
         setSyncStatus('local', 'Sign in to start');
@@ -4382,6 +4549,7 @@
     }
 
     function stopRound(save) {
+      clearRoundStartCountdown();
       clearPendingAnswerCheck();
       var finalFpm = (save && round) ? getRoundFpm(round) : 0;
       document.body.classList.remove('round-active');
