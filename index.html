@@ -4382,6 +4382,7 @@
     }
 
     function stopRound(save) {
+      clearPendingAnswerCheck();
       var finalFpm = (save && round) ? getRoundFpm(round) : 0;
       document.body.classList.remove('round-active');
       if (el.mobileCornerTimer) { el.mobileCornerTimer.classList.remove('danger', 'warn'); el.mobileCornerTimer.textContent = ''; }
@@ -4432,6 +4433,7 @@
     }
 
     function nextProblem() {
+      clearPendingAnswerCheck();
       clearTimeout(timeoutTimer);
       hideTimeoutOverlay();
       hideCooldown();
@@ -4691,19 +4693,83 @@
 
     // ═══════════════════════════ KEYPAD ═══════════════════════════
     var MAX_ANSWER_DIGITS = 3;
+    var pendingAnswerCheckToken = 0;
+    var pendingAnswerCheckFrame = null;
+    var pendingAnswerCheckTimer = null;
+
+    function clearPendingAnswerCheck() {
+      pendingAnswerCheckToken++;
+      if (pendingAnswerCheckFrame !== null && window.cancelAnimationFrame) {
+        window.cancelAnimationFrame(pendingAnswerCheckFrame);
+      }
+      if (pendingAnswerCheckTimer !== null) {
+        clearTimeout(pendingAnswerCheckTimer);
+      }
+      pendingAnswerCheckFrame = null;
+      pendingAnswerCheckTimer = null;
+    }
+
+    function getCurrentAnswerDigitLimit() {
+      if (!round || !round.currentProblem) return MAX_ANSWER_DIGITS;
+      return Math.min(MAX_ANSWER_DIGITS, String(round.currentProblem.answer).length);
+    }
+
+    function queueAnswerInputCheck() {
+      clearPendingAnswerCheck();
+      if (!round || !round.currentProblem) return;
+      if (!isPracticeAllowed()) return;
+
+      var raw = el.answerInput.value.trim();
+      if (!raw) {
+        hideFeedback();
+        return;
+      }
+
+      var neededDigits = getCurrentAnswerDigitLimit();
+      if (raw.length < neededDigits) {
+        hideFeedback();
+        return;
+      }
+
+      // Let the just-entered digit paint before checking. This keeps multi-digit
+      // answers visible while still advancing on the next available frame.
+      var token = pendingAnswerCheckToken;
+      var problemKey = round.currentProblem.displayKey;
+      var submittedValue = raw;
+      var runCheck = function () {
+        pendingAnswerCheckFrame = null;
+        pendingAnswerCheckTimer = null;
+        if (token !== pendingAnswerCheckToken) return;
+        if (!round || !round.currentProblem) return;
+        if (round.currentProblem.displayKey !== problemKey) return;
+        if (el.answerInput.value.trim() !== submittedValue) return;
+        handleAnswerInput();
+      };
+
+      if (window.requestAnimationFrame) {
+        pendingAnswerCheckFrame = window.requestAnimationFrame(function () {
+          pendingAnswerCheckFrame = null;
+          pendingAnswerCheckTimer = setTimeout(runCheck, 0);
+        });
+      } else {
+        pendingAnswerCheckTimer = setTimeout(runCheck, 0);
+      }
+    }
 
     function handleKeypad(key) {
       if (!isPracticeAllowed()) return;
       var input = el.timeoutOverlay.classList.contains('active') ? el.timeoutInput : el.answerInput;
       if (input.disabled) return;
       if (key === 'backspace') {
+        if (input === el.answerInput) clearPendingAnswerCheck();
         input.value = input.value.slice(0, -1);
       } else {
-        if (input.value.length >= MAX_ANSWER_DIGITS) return;
+        var digitLimit = (input === el.answerInput) ? getCurrentAnswerDigitLimit() : MAX_ANSWER_DIGITS;
+        if (input.value.length >= digitLimit) return;
         input.value += key;
       }
       if (input === el.timeoutInput) handleTimeoutInput();
-      else handleAnswerInput();
+      else queueAnswerInputCheck();
       focusIfDesktop(input);
     }
 
@@ -5727,7 +5793,7 @@
         });
       }
       el.startBtn.addEventListener('click', startRound);
-      el.answerInput.addEventListener('input', handleAnswerInput);
+      el.answerInput.addEventListener('input', queueAnswerInputCheck);
       el.timeoutInput.addEventListener('input', handleTimeoutInput);
       el.keyButtons.forEach(function (btn) {
         btn.addEventListener('click', function () { handleKeypad(btn.dataset.key); });
