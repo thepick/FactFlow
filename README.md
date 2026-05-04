@@ -6,48 +6,62 @@ FactFlow is a local-first multiplication fluency web app designed for student pr
 
 FactFlow gives students focused multiplication practice while tracking how they are doing on each fact. The app adjusts practice based on performance, so facts that are slow, missed, or not yet fluent can appear again while mastered facts gradually need less attention.
 
-Students can use FactFlow without signing in. Progress is saved on the device by default. Students may also choose to sign in with Google to sync their progress across devices using a hidden Google Drive app data file.
+Progress is saved directly on the device using browser storage. No sign-in, account, database, Firebase setup, or custom backend is required.
 
 ## Key features
 
 - Timed multiplication practice rounds
 - Adaptive fact selection based on accuracy, speed, and recent performance
-- Progress grid showing fluent, in-progress, and locked facts
+- Progress grid showing fluent, in-progress, struggling, and locked facts
 - Mastery score and progress graph
+- More forgiving mastery logic so one slightly slow answer does not immediately remove progress
 - Streak and facts-per-minute tracking
+- Adjustable speed target
 - Light mode, dark mode, and match-device appearance options
 - Optional mobile haptic feedback
+- Simple reset-progress options
 - Local device storage with no account required
-- Optional Google sign-in for cross-device progress sync
-- Google Drive app data sync without Firebase, a database, or a custom backend
-- Offline-friendly practice with sync catching up when available
+- Offline-friendly practice
+- Short confetti celebration when students progress to a new table
 
-## Google Drive sync
+## Local progress storage
 
-FactFlow can optionally sync progress through the student's Google Drive app data folder. This keeps the sync file hidden from the student's normal Drive view and limits the app to its own progress data.
+FactFlow saves progress locally in the browser. This means students can open the app and begin practicing without creating an account or signing in.
 
-Sync is local-first:
+Progress is saved on the device being used. If a student switches to a different browser or device, that device will have its own separate progress unless progress data is manually transferred outside the app.
 
+Because FactFlow is local-first:
+
+- Practice works without an internet connection after the app has loaded.
 - Progress is saved immediately on the device.
-- If Google sync is enabled, progress is also saved to Google Drive.
-- When the app is opened on another device, the latest synced progress can be merged and shown.
-- If the internet is unavailable, students can keep practicing locally.
-- Sync resumes when the device is online and the student is signed in again.
-
-Google sync is optional. Students can continue using FactFlow fully without signing in.
+- No student account is required.
+- No cloud database or server is needed.
+- Student progress stays on the device.
 
 ## Designed for students
 
-The interface is simple and classroom-friendly. Students can start a round, answer using the on-screen keypad, and see immediate feedback. The progress tools help students and teachers quickly understand which facts are becoming fluent and which still need practice.
+The interface is simple and classroom-friendly. Students can start a round, answer using the on-screen keypad, and see immediate feedback.
+
+The progress tools help students and teachers quickly understand which facts are becoming fluent, which facts are still developing, and which facts need more practice.
+
+## Mastery and progress
+
+FactFlow tracks each multiplication fact individually. A fact can move through different progress states based on accuracy, speed, confidence, and recent performance.
+
+The mastery system is designed to encourage steady growth without being overly strict. Mastered facts are more stable, so one slightly slow correct answer should not immediately erase progress. Facts that are missed, timed out, or repeatedly slow can still be reviewed more often.
+
+The progress graph shows growth over time using the student's saved quiz results.
 
 ## Privacy and storage
 
-FactFlow saves progress locally using browser storage. No login is required for local use.
+FactFlow saves progress locally using browser storage. No login is required.
 
-If Google sync is enabled, FactFlow stores a progress file in the student's Google Drive app data folder. This file is used only for FactFlow progress syncing. FactFlow does not need Firebase, a separate database, or a custom server.
+FactFlow should not store student names, class lists, or other unnecessary personal information in the progress data.
 
-FactFlow should not store student names, class lists, or other unnecessary personal information in the progress file.
+If browser data is cleared, local progress may be deleted.
 
 ## Best use case
 
-FactFlow works well for daily multiplication fluency practice in upper elementary classrooms, intervention groups, homework stations, or independent review. It is especially useful when students may practice across more than one device, such as a home computer, mobile browser, and school computer.
+FactFlow works well for daily multiplication fluency practice in upper elementary classrooms, intervention groups, homework stations, or independent review.
+
+It is especially useful for quick, repeated practice sessions where students need clear feedback, manageable goals, and visible progress over time.
