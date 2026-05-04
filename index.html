@@ -483,7 +483,7 @@
       display: block;
       width: 100%;
       flex: 1;
-      min-height: 160px;
+      min-height: 300px;
     }
     /* -- Mastery score card -- */
     .mastery-scorecard {
@@ -678,7 +678,7 @@
         justify-content: stretch;
         gap: 0.45rem 0.65rem;
       }
-      .progress-graph svg { min-height: 130px; }
+      .progress-graph svg { min-height: 300px; }
       body.mobile-play-mode.round-active .pg-panel { display: none; }
       body.mobile-play-mode.round-active .progress-graph-wrap { display: none; }
     }
@@ -1488,7 +1488,6 @@
             <span><span class="swatch ln"></span> Learning</span>
             <span><span class="swatch st"></span> Needs Practice</span>
             <span><span class="swatch emp"></span> Not Started</span>
-            <span><span class="swatch lk"></span> Locked</span>
           </div>
           <div class="progress-graph-wrap">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)"><h3 style="margin-bottom:0">Mastery Over Time</h3><button type="button" id="graphToggleBtn" class="btn-ghost" style="font-size:0.68rem;padding:0.2rem 0.5rem;min-height:auto;border-radius:var(--radius-full);opacity:0.7;letter-spacing:0.03em" title="Toggle between recent and all saved quiz results">Show all results</button></div>
@@ -5380,6 +5379,7 @@
 
       var visiblePoints = graphShowAllResults ? allPoints.slice() : allPoints.slice(-GRAPH_DEFAULT_VISIBLE_RESULTS);
       var averages = calculateAverages(visiblePoints);
+      var averageLabel = graphShowAllResults ? 'Avg all:' : 'Avg last ' + visiblePoints.length + ':';
 
       // Score card above the graph
       var latest = history.length ? history[history.length - 1] : null;
@@ -5399,8 +5399,7 @@
         if (latest.fpm != null) scoreCardHtml += '<span class="mastery-stat-piece">Speed: ' + latest.fpm + '/min</span>';
         scoreCardHtml += '</div>';
         scoreCardHtml += '<div class="mastery-avg-stats">';
-        scoreCardHtml += '<span class="mastery-avg-piece">Visible avg speed: ' + averages.fpm + '/min</span>';
-        scoreCardHtml += '<span class="mastery-avg-piece">Visible avg accuracy: ' + averages.acc + '%</span>';
+        scoreCardHtml += '<span class="mastery-avg-piece">' + averageLabel + ' ' + averages.fpm + ' facts/min &middot; Acc ' + averages.acc + '%</span>';
         scoreCardHtml += '</div>';
         scoreCardHtml += '</div>';
       } else {
@@ -5408,7 +5407,7 @@
       }
 
       var width = 360;
-      var height = 190;
+      var height = 300;
       var left = 32;
       var right = 14;
       var top = 16;
