@@ -96,6 +96,7 @@
     .stat.time-danger { background: var(--color-error-highlight); transition: background 0.4s ease; }
     .practice-subtitle-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
     .daily-quizzes { font-size: var(--text-sm); color: var(--color-text-muted); font-weight: 700; white-space: nowrap; }
+    .quiz-stat-divider { margin: 0 0.35rem; color: var(--color-text-faint); }
     .bar-block { margin-top: var(--space-3); }
     .bar-label-row { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; margin-bottom: 0.35rem; font-size: var(--text-sm); color: var(--color-text-muted); }
     .bar-label-main { color: var(--color-text); font-weight: 800; }
@@ -670,6 +671,74 @@
       margin-bottom: var(--space-2); max-width: none; line-height: 1.5;
     }
     .settings-confirm-box .settings-item { margin-bottom: var(--space-1); }
+    /* ──── Mobile haptics information button ──── */
+    .haptics-row {
+      grid-template-columns: 32px minmax(0, 1fr) 24px 18px;
+    }
+
+    .haptics-info-btn {
+      width: 22px;
+      height: 22px;
+      border-radius: var(--radius-full);
+      display: inline-grid;
+      place-items: center;
+      background: var(--color-surface-offset);
+      color: var(--color-text-muted);
+      border: 1px solid color-mix(in srgb, var(--color-text) 12%, transparent);
+      font-size: 0.72rem;
+      font-weight: 900;
+      line-height: 1;
+      padding: 0;
+    }
+
+    .haptics-info-btn:hover,
+    .haptics-info-btn:focus-visible {
+      color: var(--color-primary);
+      border-color: color-mix(in srgb, var(--color-primary) 40%, transparent);
+      background: var(--color-primary-highlight);
+      outline: none;
+    }
+
+    /* ──── Speed target slider ──── */
+    .speed-target-row {
+      cursor: default;
+    }
+
+    .speed-target-row input[type="range"] {
+      width: 100%;
+      min-height: 28px;
+      margin-top: 0.35rem;
+      padding: 0;
+    }
+
+    .speed-target-marks {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 0.12rem;
+      font-size: 0.66rem;
+      color: var(--color-text-muted);
+      font-weight: 700;
+    }
+
+    .speed-target-note {
+      display: block;
+      margin-top: 0.3rem;
+      font-size: 0.68rem;
+      color: var(--color-text-faint);
+      line-height: 1.25;
+    }
+
+    .graph-dot.speed-mastered {
+      fill: var(--cell-fluent);
+    }
+
+    .graph-dot.speed-learning {
+      fill: var(--cell-learning);
+    }
+
+    .graph-dot.speed-struggling {
+      fill: var(--cell-struggling);
+    }
     /* ──── Level-up toast ──── */
     .levelup-toast {
       display: none; position: fixed; top: 72px; left: 50%;
@@ -824,6 +893,7 @@
   })();
 </script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
     <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
     <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="48x48" href="favicon-48x48.png">
@@ -925,7 +995,7 @@
             </button>
 
             <div class="settings-section-label">Mobile</div>
-            <button type="button" class="settings-item settings-item-row" id="hapticsToggleBtn" aria-pressed="true">
+            <div class="settings-item settings-item-row haptics-row" id="hapticsToggleBtn" role="button" tabindex="0" aria-pressed="true">
               <span class="settings-icon" aria-hidden="true">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <rect x="7" y="2" width="10" height="20" rx="2"></rect>
@@ -936,14 +1006,41 @@
                 <span class="settings-title">Haptic Feedback</span>
                 <span class="settings-subtitle" id="hapticsStatusText">On</span>
               </span>
-              <button type="button" id="hapticsInfoBtn" aria-label="Haptic feedback information"
-                style="width:20px;height:20px;border-radius:var(--radius-full);display:inline-grid;place-items:center;background:var(--color-surface-offset);color:var(--color-text-muted);border:1px solid color-mix(in oklab,var(--color-text) 12%,transparent);font-size:0.7rem;font-weight:900;line-height:1;flex-shrink:0;margin-left:auto">
-                i
-              </button>
+              <button type="button" class="haptics-info-btn" id="hapticsInfoBtn" aria-label="Haptic feedback information">i</button>
               <span class="settings-check" aria-hidden="true">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
               </span>
-            </button>
+            </div>
+
+            <div class="settings-divider"></div>
+            <div class="settings-section-label">Practice Target</div>
+            <div class="settings-item settings-item-row speed-target-row" id="speedTargetRow">
+              <span class="settings-icon" aria-hidden="true">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z"></path>
+                </svg>
+              </span>
+              <span class="settings-text">
+                <span class="settings-title">Speed Target</span>
+                <span class="settings-subtitle">
+                  <span id="speedTargetValue">30</span> facts/min
+                </span>
+                <input
+                  type="range"
+                  id="speedTargetSlider"
+                  min="0"
+                  max="4"
+                  step="1"
+                  value="1"
+                  aria-label="Speed target in facts per minute"
+                />
+                <span class="speed-target-marks" aria-hidden="true">
+                  <span>20</span><span>30</span><span>40</span><span>50</span><span>60</span>
+                </span>
+                <span class="speed-target-note">This affects the speed bar and graph scoring.</span>
+              </span>
+              <span class="settings-check" aria-hidden="true"></span>
+            </div>
 
             <div class="settings-divider"></div>
             <div class="settings-section-label">Progress</div>
@@ -1013,7 +1110,11 @@
                 <h2 id="practiceTitle">Practice</h2>
                 <div class="practice-subtitle-row">
                   <p class="subtle" id="practiceSubtitle">Ready</p>
-                  <span class="daily-quizzes">Today's Quizzes: <span id="todaysQuizValue">0</span></span>
+                  <span class="daily-quizzes">
+                Today's Quizzes: <span id="todaysQuizValue">0</span>
+                <span class="quiz-stat-divider">|</span>
+                Total Quizzes: <span id="totalQuizValue">0</span>
+              </span>
                 </div>
               </div>
               <span class="pill" id="roundStatePill">Ready</span>
@@ -1130,10 +1231,11 @@
       </div>
       <p>Your score is mostly based on how many multiplication facts you have mastered.</p>
       <ul>
-        <li>Fluent facts count fully.</li>
-        <li>In-progress facts count partly.</li>
-        <li>Accuracy and speed add a small bonus.</li>
-        <li>The bonus grows as you master more facts, so progress matters most.</li>
+        <li>Green facts are fast, accurate, and consistent across spaced attempts.</li>
+        <li>Yellow facts are still being learned.</li>
+        <li>Red facts need extra review because of a recent wrong answer, timeout, or slow response.</li>
+        <li>A green fact can move back down if it later shows weakness.</li>
+        <li>Fluent facts count fully, in-progress facts count partly, and accuracy and speed add a small bonus.</li>
       </ul>
       <p>The graph shows your most recent 10 quiz results by default. Use "Show all results" to see your saved Google progress.</p>
       <p>The chart zooms in to show progress clearly, but the mastery score is always out of 100.</p>
@@ -1183,10 +1285,10 @@
     var STARTING_TABLE = 2;   // First times table (default: 2)
     var MAX_TABLE      = 12;  // Last times table  (default: 12)
 
-    // Speed bar target. Change this one number to adjust how hard it is to fill the runner speed bar.
-    // Lower number = easier to fill. Higher number = harder to fill.
-    // Examples: 24 = easier, 30 = recommended default, 36 = more challenging.
-    var SPEED_FULL_BAR_FPM = 30;
+    // User-adjustable speed target.
+    // Saved on the synced progress object so each Google user can have a different target.
+    var SPEED_TARGET_OPTIONS = [20, 30, 40, 50, 60];
+    var DEFAULT_SPEED_TARGET_FPM = 30;
 
     // Overall mastery score weights. The score is mostly grid progress.
     // In-progress facts count as partial progress, while accuracy and speed add only a small progress-gated bonus.
@@ -1194,8 +1296,12 @@
     var MASTERY_IN_PROGRESS_WEIGHT = 0.5;
     var MASTERY_PROGRESS_WEIGHT = 0.85;
     var MASTERY_PERFORMANCE_BONUS_WEIGHT = 0.15;
-    var MASTERY_SPEED_TARGET_FPM = SPEED_FULL_BAR_FPM;
     var MASTERY_SCORE_FORMULA_VERSION = 'grid-progress-v1';
+    var PROGRESS_SCHEMA_VERSION = 2;
+
+    // Confetti state
+    var confettiTimer = null;
+    var hasLaunchedConfetti = false;
 
     // Mastery graph display. Default view shows the most recent completed quizzes.
     // Change this number if you want the graph to show more or fewer recent quiz results by default.
@@ -1296,6 +1402,7 @@
       el.personalBestValue = document.getElementById('personalBestValue');
       el.bestSpeedValue = document.getElementById('bestSpeedValue');
       el.todaysQuizValue = document.getElementById('todaysQuizValue');
+      el.totalQuizValue = document.getElementById('totalQuizValue');
       el.settingsMenuWrap = document.getElementById('settingsMenuWrap');
       el.settingsBtn = document.getElementById('settingsBtn');
       el.settingsDropdown = document.getElementById('settingsDropdown');
@@ -1310,6 +1417,8 @@
       el.hapticsInfoOverlay  = document.getElementById('hapticsInfoOverlay');
       el.hapticsInfoCloseBtn = document.getElementById('hapticsInfoCloseBtn');
       el.hapticsInfoDoneBtn  = document.getElementById('hapticsInfoDoneBtn');
+      el.speedTargetSlider = document.getElementById('speedTargetSlider');
+      el.speedTargetValue = document.getElementById('speedTargetValue');
       el.scoreInfoOverlay = document.getElementById('scoreInfoOverlay');
       el.scoreInfoCloseBtn = document.getElementById('scoreInfoCloseBtn');
       el.scoreInfoDoneBtn = document.getElementById('scoreInfoDoneBtn');
@@ -1412,6 +1521,22 @@
       return Date.now();
     }
 
+    function getValidSpeedTargetFpm(value) {
+      value = Number(value);
+      return SPEED_TARGET_OPTIONS.indexOf(value) > -1 ? value : DEFAULT_SPEED_TARGET_FPM;
+    }
+
+    function getSpeedTargetFpm() {
+      var progress = loadProgress();
+      return getValidSpeedTargetFpm(progress.speedTargetFpm);
+    }
+
+    function getSpeedTargetIndex(value) {
+      var target = getValidSpeedTargetFpm(value);
+      var index = SPEED_TARGET_OPTIONS.indexOf(target);
+      return index > -1 ? index : SPEED_TARGET_OPTIONS.indexOf(DEFAULT_SPEED_TARGET_FPM);
+    }
+
     function makeRandomSuffix() {
       return Math.random().toString(36).slice(2, 10);
     }
@@ -1451,7 +1576,7 @@
     }
 
     function blankProgress() {
-      return { currentTable: STARTING_TABLE, factStats: {}, sessionsCompleted: 0, sessionHistory: [], allTimeBestStreak: 0, allTimeBestFpm: 0, dailyQuizCounts: {} };
+      return { schemaVersion: PROGRESS_SCHEMA_VERSION, currentTable: STARTING_TABLE, factStats: {}, sessionsCompleted: 0, sessionHistory: [], allTimeBestStreak: 0, allTimeBestFpm: 0, dailyQuizCounts: {}, speedTargetFpm: DEFAULT_SPEED_TARGET_FPM, speedTargetUpdatedAtMs: 0 };
     }
 
     function normalizeProgressForSave(p) {
@@ -1464,6 +1589,9 @@
       if (p.allTimeBestStreak == null) p.allTimeBestStreak = 0;
       if (p.allTimeBestFpm == null) p.allTimeBestFpm = 0;
       if (!p.dailyQuizCounts) p.dailyQuizCounts = {};
+      if (!p.schemaVersion) p.schemaVersion = PROGRESS_SCHEMA_VERSION;
+      p.speedTargetFpm = getValidSpeedTargetFpm(p.speedTargetFpm);
+      if (p.speedTargetUpdatedAtMs == null) p.speedTargetUpdatedAtMs = 0;
       return p;
     }
 
@@ -1543,19 +1671,85 @@
     }
 
     function defaultProgress() {
-      return { currentTable: STARTING_TABLE, factStats: {}, sessionsCompleted: 0, sessionHistory: [], allTimeBestStreak: 0, allTimeBestFpm: 0, dailyQuizCounts: {} };
+      return {
+        schemaVersion: PROGRESS_SCHEMA_VERSION,
+        currentTable: STARTING_TABLE,
+        factStats: {},
+        sessionsCompleted: 0,
+        sessionHistory: [],
+        allTimeBestStreak: 0,
+        allTimeBestFpm: 0,
+        dailyQuizCounts: {},
+        speedTargetFpm: DEFAULT_SPEED_TARGET_FPM,
+        speedTargetUpdatedAtMs: 0
+      };
+    }
+
+    function migrateProgress(progress) {
+      var p = progress || defaultProgress();
+
+      if (!p.schemaVersion) p.schemaVersion = 1;
+      if (!p.factStats) p.factStats = {};
+      if (!p.sessionHistory) p.sessionHistory = [];
+      if (!p.dailyQuizCounts) p.dailyQuizCounts = {};
+      if (p.allTimeBestStreak == null) p.allTimeBestStreak = 0;
+      if (p.allTimeBestFpm == null) p.allTimeBestFpm = 0;
+
+      if (p.schemaVersion < PROGRESS_SCHEMA_VERSION) {
+        migrateFactStatsV2(p.factStats);
+        p.schemaVersion = PROGRESS_SCHEMA_VERSION;
+      }
+
+      p.speedTargetFpm = getValidSpeedTargetFpm(p.speedTargetFpm);
+
+      return p;
+    }
+
+    function migrateFactStatsV2(factStats) {
+      var key;
+      for (key in factStats) {
+        if (Object.prototype.hasOwnProperty.call(factStats, key)) {
+          factStats[key] = normalizeFactStatsV2(factStats[key]);
+        }
+      }
+    }
+
+    function normalizeFactStatsV2(s) {
+      var out = s || blankStats();
+
+      if (out.shown == null) out.shown = 0;
+      if (out.correct == null) out.correct = 0;
+      if (out.incorrect == null) out.incorrect = 0;
+      if (out.timeouts == null) out.timeouts = 0;
+      if (out.avgMs == null) out.avgMs = 0;
+      if (out.mastery == null) out.mastery = 0;
+      if (out.lastSeen == null) out.lastSeen = null;
+      if (out.lastSeenTs == null) out.lastSeenTs = 0;
+      if (out.lastResponseMs == null) out.lastResponseMs = 0;
+      if (!Array.isArray(out.recent)) out.recent = [];
+      if (out.fastStreak == null) out.fastStreak = 0;
+      if (out.slowOrWrongCount == null) out.slowOrWrongCount = 0;
+      if (out.cooldownUntil == null) out.cooldownUntil = 0;
+
+      if (out.masteryVersion == null) out.masteryVersion = 2;
+      if (out.confidence == null) out.confidence = Math.round((Number(out.mastery) || 0) * 100);
+      if (out.lastWeakAt == null) out.lastWeakAt = 0;
+      if (out.lastHelpAt == null) out.lastHelpAt = 0;
+      if (!out.lastStatus) out.lastStatus = 'empty';
+
+      return out;
     }
 
     function loadProgress() {
       if (SHARED_DEVICE_MODE) {
-        return loadWorkingProgress();
+        return migrateProgress(loadWorkingProgress());
       }
 
       var uid = getUserId();
-      if (!uid) return defaultProgress();
+      if (!uid) return migrateProgress(defaultProgress());
       try {
         var raw = localStorage.getItem(STORAGE_KEY + uid);
-        if (!raw) return defaultProgress();
+        if (!raw) return migrateProgress(defaultProgress());
         var p = JSON.parse(raw);
         if (!p.factStats) p.factStats = {};
         if (!p.currentTable || p.currentTable < STARTING_TABLE) p.currentTable = STARTING_TABLE;
@@ -1564,8 +1758,8 @@
         if (p.allTimeBestStreak == null) p.allTimeBestStreak = 0;
         if (p.allTimeBestFpm == null) p.allTimeBestFpm = 0;
         if (!p.dailyQuizCounts) p.dailyQuizCounts = {};
-        return p;
-      } catch (e) { return defaultProgress(); }
+        return migrateProgress(p);
+      } catch (e) { return migrateProgress(defaultProgress()); }
     }
 
     function saveProgressToStorage(progress, opts) {
@@ -1586,7 +1780,8 @@
       var uid = getUserId();
       if (!uid) return;
 
-      var saved = cloneJson(progress) || blankProgress();
+      var saved = cloneJson(progress) || defaultProgress();
+      saved = migrateProgress(saved);
       saved = normalizeProgressForSave(saved);
       saved.updatedAt = nowIso();
       saved.updatedAtMs = nowMs();
@@ -1631,8 +1826,38 @@
       return p.dailyQuizCounts[getLocalDateKey()] || 0;
     }
 
+    function getTotalQuizCount(progress) {
+      var p = progress || loadProgress();
+      var total = Number(p.sessionsCompleted || 0);
+
+      if (total > 0) return total;
+
+      if (p.sessionHistory && p.sessionHistory.length) {
+        return p.sessionHistory.length;
+      }
+
+      if (p.dailyQuizCounts) {
+        var sum = 0;
+        var key;
+        for (key in p.dailyQuizCounts) {
+          if (Object.prototype.hasOwnProperty.call(p.dailyQuizCounts, key)) {
+            sum += Number(p.dailyQuizCounts[key]) || 0;
+          }
+        }
+        return sum;
+      }
+
+      return 0;
+    }
+
     function updateTodaysQuizDisplay(progress) {
       if (el.todaysQuizValue) el.todaysQuizValue.textContent = String(getTodaysQuizCount(progress));
+    }
+
+    function updateTotalQuizDisplay(progress) {
+      if (el.totalQuizValue) {
+        el.totalQuizValue.textContent = String(getTotalQuizCount(progress));
+      }
     }
 
     function getBestSpeedText(progress) {
@@ -1657,6 +1882,7 @@
         renderProgressGraph();
         updatePracticeHeader();
         updateTodaysQuizDisplay(getBlankWorkingProgress());
+        updateTotalQuizDisplay(getBlankWorkingProgress());
         updateBestSpeedDisplay(getBlankWorkingProgress());
         return;
       }
@@ -1665,6 +1891,7 @@
       updatePracticeHeader();
       var p = loadProgress();
       updateTodaysQuizDisplay(p);
+      updateTotalQuizDisplay(p);
       updateBestSpeedDisplay(p);
     }
 
@@ -2172,6 +2399,7 @@
             syncState.pendingPush = false;
             syncState.lastSyncedLocalHash = getProgressHash(cloudProgress);
             refreshProgressUi();
+            syncSpeedTargetSlider();
             setPracticeLocked(false);
             return true;
           }
@@ -2188,6 +2416,7 @@
             syncState.lastSyncedLocalHash = cloudHash;
 
             refreshProgressUi();
+            syncSpeedTargetSlider();
             setPracticeLocked(false);
             return true;
           });
@@ -2596,6 +2825,8 @@
 
       merged.dailyQuizCounts = rebuildDailyQuizCounts(merged.sessionHistory, local.dailyQuizCounts, cloud.dailyQuizCounts);
 
+      merged.speedTargetFpm = chooseMergedSpeedTarget(local, cloud);
+
       // Settings are intentionally device-local.
       merged.settings = copySettings(state.settings);
 
@@ -2603,6 +2834,16 @@
       merged.updatedAtMs = nowMs();
 
       return merged;
+    }
+
+    function chooseMergedSpeedTarget(local, cloud) {
+      var localTarget = getValidSpeedTargetFpm(local && local.speedTargetFpm);
+      var cloudTarget = getValidSpeedTargetFpm(cloud && cloud.speedTargetFpm);
+      var localUpdated = Number(local && local.speedTargetUpdatedAtMs) || 0;
+      var cloudUpdated = Number(cloud && cloud.speedTargetUpdatedAtMs) || 0;
+
+      if (cloudUpdated > localUpdated) return cloudTarget;
+      return localTarget;
     }
 
     function mergeFactStats(aStats, bStats) {
@@ -2638,8 +2879,22 @@
       out.fastStreak = Math.max(Number(a.fastStreak) || 0, Number(b.fastStreak) || 0);
       out.slowOrWrongCount = Math.max(Number(a.slowOrWrongCount) || 0, Number(b.slowOrWrongCount) || 0);
       out.cooldownUntil = Math.max(Number(a.cooldownUntil) || 0, Number(b.cooldownUntil) || 0);
+      out.masteryVersion = 2;
+      out.confidence = Math.max(Number(a.confidence) || 0, Number(b.confidence) || 0);
+      out.lastWeakAt = Math.max(Number(a.lastWeakAt) || 0, Number(b.lastWeakAt) || 0);
+      out.lastHelpAt = Math.max(Number(a.lastHelpAt) || 0, Number(b.lastHelpAt) || 0);
+      out.lastStatus = getMoreConservativeStatus(a.lastStatus, b.lastStatus);
 
       return out;
+    }
+
+    function getMoreConservativeStatus(a, b) {
+      var rank = { empty: 0, fluent: 1, learning: 2, struggling: 3 };
+      var aa = a || 'empty';
+      var bb = b || 'empty';
+
+      if ((rank[bb] || 0) > (rank[aa] || 0)) return bb;
+      return aa;
     }
 
     function mergeRecentAttempts(aRecent, bRecent) {
@@ -2906,6 +3161,7 @@
             if (localNeedsUpdate) {
               saveProgressLocalOnly(merged, 'cloud-merge');
               if (!round) refreshProgressUi();
+              if (!round) syncSpeedTargetSlider();
             }
 
             if (cloudNeedsUpdate) {
@@ -3082,27 +3338,33 @@
       if (s.recent.length > 12) s.recent.shift();
 
       var a = state.settings.adaptive;
-      var fastEnough = isCorrect && responseMs <= a.fluentMs;
-      var slowOrWrong = !isCorrect || responseMs >= a.fluentMs * 1.55;
-      s.fastStreak = fastEnough ? s.fastStreak + 1 : 0;
-      s.slowOrWrongCount = slowOrWrong ? Math.min(s.slowOrWrongCount + 1, 8) : Math.max(s.slowOrWrongCount - 1, 0);
 
-      var recentSlice = s.recent.slice(-6);
-      var recentAcc = recentSlice.length ? recentSlice.filter(function (r) { return r.isCorrect && !r.timeout; }).length / recentSlice.length : 0;
-      var recentSpeed = recentSlice.length ? recentSlice.reduce(function (sum, r) { return sum + r.responseMs; }, 0) / recentSlice.length : s.avgMs || 0;
-      var baseAcc = s.correct / Math.max(1, s.shown);
-      var speedScore = recentSpeed <= a.fluentMs * 0.78 ? 1 : recentSpeed >= a.fluentMs * 2.2 ? 0.15 : 1 - ((recentSpeed - a.fluentMs * 0.78) / (a.fluentMs * 1.42)) * 0.85;
-      var consistency = recentSlice.length ? recentSlice.reduce(function (sum, r) { return sum + (r.isCorrect ? (r.responseMs <= 3500 ? 1 : 0.6) : 0); }, 0) / recentSlice.length : 0;
-      s.mastery = clamp((baseAcc * 0.35) + (recentAcc * 0.30) + (speedScore * 0.20) + (consistency * 0.15), 0, 1);
+      if (isCorrect && !wasTimeout && responseMs <= a.fluentMs) {
+        s.fastStreak++;
+      } else {
+        s.fastStreak = 0;
+      }
+
+      if (!isCorrect || wasTimeout || responseMs > a.fluentMs * 1.5) {
+        s.slowOrWrongCount++;
+      } else if (s.slowOrWrongCount > 0) {
+        s.slowOrWrongCount--;
+      }
+
+      s.confidence = updateFactConfidence(s, isCorrect, responseMs, wasTimeout, a);
+      s.mastery = clamp(s.confidence / 100, 0, 1);
+      s.lastStatus = getFactDisplayStatus(s, a);
 
       if (!isCorrect || wasTimeout) {
-        s.cooldownUntil = now;
-      } else if (responseMs <= a.fluentMs * 0.85 && s.fastStreak >= 2) {
-        s.cooldownUntil = now + Math.round(a.overdueMs * 1.8);
-      } else if (responseMs <= a.fluentMs * 1.15) {
-        s.cooldownUntil = now + a.overdueMs;
-      } else {
         s.cooldownUntil = now + Math.round(a.overdueMs * 0.35);
+      } else if (isFactStruggling(s, a)) {
+        s.cooldownUntil = now + Math.round(a.overdueMs * 0.65);
+      } else if (s.confidence < 50) {
+        s.cooldownUntil = now + Math.round(a.overdueMs * 0.8);
+      } else if (s.confidence < 85) {
+        s.cooldownUntil = now + Math.round(a.overdueMs * 1.4);
+      } else {
+        s.cooldownUntil = now + Math.round(a.overdueMs * 3.0);
       }
 
       saveProgressToStorage(progress);
@@ -3111,17 +3373,254 @@
     }
 
     function blankStats() {
-      return { shown: 0, correct: 0, incorrect: 0, timeouts: 0, avgMs: 0, mastery: 0, lastSeen: null, lastSeenTs: 0, lastResponseMs: 0, recent: [], fastStreak: 0, slowOrWrongCount: 0, cooldownUntil: 0 };
+      return {
+        shown: 0, correct: 0, incorrect: 0, timeouts: 0, avgMs: 0,
+        mastery: 0, lastSeen: null, lastSeenTs: 0, lastResponseMs: 0,
+        recent: [], fastStreak: 0, slowOrWrongCount: 0, cooldownUntil: 0,
+        masteryVersion: 2, confidence: 0, lastWeakAt: 0, lastHelpAt: 0, lastStatus: 'empty'
+      };
+    }
+
+    // ═══ New mastery helpers (V2) ═══
+    function getRecentAttempts(s, count) {
+      var recent = s && Array.isArray(s.recent) ? s.recent : [];
+      return recent.slice(Math.max(0, recent.length - count));
+    }
+
+    function isWeakAttempt(attempt, adaptive) {
+      if (!attempt) return false;
+      if (attempt.timeout) return true;
+      if (!attempt.isCorrect) return true;
+      return Number(attempt.responseMs || 0) > adaptive.fluentMs * 1.5;
+    }
+
+    function wasRecentEvent(timestamp, adaptive) {
+      var now = Date.now();
+      var age = now - Number(timestamp || 0);
+      return age >= 0 && age <= adaptive.overdueMs * 6;
+    }
+
+    function hasRecentWeakness(s, adaptive) {
+      var recent = getRecentAttempts(s, 4);
+      var i;
+      for (i = 0; i < recent.length; i += 1) {
+        if (isWeakAttempt(recent[i], adaptive)) return true;
+      }
+      return false;
+    }
+
+    function hasRecentTimeoutOrWrong(s, count) {
+      var recent = getRecentAttempts(s, count);
+      var i;
+      for (i = 0; i < recent.length; i += 1) {
+        if (recent[i].timeout || !recent[i].isCorrect) return true;
+      }
+      return false;
+    }
+
+    function hasSpacedSuccesses(attempts, adaptive) {
+      var minGap = Math.max(5000, adaptive.overdueMs * 0.5);
+      var i;
+      if (!attempts || attempts.length < 3) return false;
+      for (i = 1; i < attempts.length; i += 1) {
+        if (Math.abs(Number(attempts[i].at || 0) - Number(attempts[i - 1].at || 0)) < minGap) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    function isFactStruggling(s, adaptive) {
+      var recent = getRecentAttempts(s, 4);
+      var weakCount = 0;
+      var i;
+
+      if (s.shown <= 0) return false;
+
+      if (s.timeouts > 0 && s.lastHelpAt && wasRecentEvent(s.lastHelpAt, adaptive)) {
+        return true;
+      }
+
+      for (i = 0; i < recent.length; i += 1) {
+        if (isWeakAttempt(recent[i], adaptive)) weakCount += 1;
+      }
+
+      if (recent.length >= 2 && weakCount >= 2) return true;
+
+      if (recent.length >= 1) {
+        var last = recent[recent.length - 1];
+        if (last.timeout || !last.isCorrect) return true;
+      }
+
+      return false;
+    }
+
+    function isFactFluent(s, adaptive) {
+      var recent = getRecentAttempts(s, 6);
+      var last3 = getRecentAttempts(s, 3);
+      var fastCorrectCount = 0;
+      var correctCount = 0;
+      var weakCount = 0;
+      var i;
+
+      if (s.shown < 4) return false;
+      if (s.confidence < 85) return false;
+
+      for (i = 0; i < recent.length; i += 1) {
+        if (isWeakAttempt(recent[i], adaptive)) weakCount += 1;
+      }
+      if (weakCount > 0) return false;
+
+      for (i = 0; i < last3.length; i += 1) {
+        if (last3[i].isCorrect && !last3[i].timeout) {
+          correctCount += 1;
+          if (last3[i].responseMs <= adaptive.fluentMs) {
+            fastCorrectCount += 1;
+          }
+        }
+      }
+
+      if (last3.length < 3) return false;
+      if (correctCount < 3) return false;
+      if (fastCorrectCount < 2) return false;
+      if (!hasSpacedSuccesses(last3, adaptive)) return false;
+
+      return true;
+    }
+
+    function getFactDisplayStatus(stats, adaptive) {
+      var s = normalizeFactStatsV2(stats);
+      if (s.shown <= 0) return 'empty';
+      if (isFactStruggling(s, adaptive)) return 'struggling';
+      if (isFactFluent(s, adaptive)) return 'fluent';
+      return 'learning';
+    }
+
+    function updateFactConfidence(s, isCorrect, responseMs, wasTimeout, adaptive) {
+      var current = Number(s.confidence);
+      var delta = 0;
+      var speedRatio = responseMs / Math.max(1, adaptive.fluentMs);
+
+      if (isNaN(current)) current = Math.round((Number(s.mastery) || 0) * 100);
+
+      if (wasTimeout) {
+        delta = -30;
+      } else if (!isCorrect) {
+        delta = -18;
+      } else if (speedRatio <= 0.85) {
+        delta = 18;
+      } else if (speedRatio <= 1.0) {
+        delta = 14;
+      } else if (speedRatio <= 1.2) {
+        delta = 8;
+      } else if (speedRatio <= 1.5) {
+        delta = 3;
+      } else {
+        delta = 0;
+      }
+
+      if (isCorrect && !wasTimeout && hasRecentWeakness(s, adaptive)) {
+        delta = Math.min(delta, 6);
+      }
+
+      if (!isCorrect || wasTimeout) {
+        s.lastWeakAt = Date.now();
+      }
+
+      if (wasTimeout) {
+        s.lastHelpAt = Date.now();
+      }
+
+      current = current + delta;
+
+      if (hasRecentWeakness(s, adaptive)) {
+        current = Math.min(current, 84);
+      }
+
+      if (hasRecentTimeoutOrWrong(s, 4)) {
+        current = Math.min(current, 74);
+      }
+
+      return clamp(Math.round(current), 0, 100);
+    }
+
+    // ═══════════════════════════ CONFETTI ═══════════════════════════
+    function launchConfettiOnce(colors) {
+      var endTime;
+      var confettiColors;
+
+      if (hasLaunchedConfetti) {
+        return;
+      }
+
+      if (typeof confetti === 'undefined') {
+        return;
+      }
+
+      hasLaunchedConfetti = true;
+      endTime = Date.now() + 5000;
+
+      confettiColors = colors || [
+        '#26ccff',
+        '#a25afd',
+        '#ff5e7e',
+        '#88ff5a',
+        '#fcff42',
+        '#ffa62d',
+        '#ff36ff'
+      ];
+
+      if (confettiTimer) {
+        clearInterval(confettiTimer);
+        confettiTimer = null;
+      }
+
+      confettiTimer = setInterval(function () {
+        if (Date.now() > endTime) {
+          clearInterval(confettiTimer);
+          confettiTimer = null;
+          return;
+        }
+
+        confetti({
+          particleCount: 100,
+          startVelocity: 30,
+          spread: 360,
+          ticks: 60,
+          origin: {
+            x: Math.random(),
+            y: Math.random() - 0.2
+          },
+          colors: confettiColors
+        });
+      }, 200);
+    }
+
+    function stopConfetti() {
+      if (confettiTimer) {
+        clearInterval(confettiTimer);
+        confettiTimer = null;
+      }
+
+      if (typeof confetti !== 'undefined' && confetti.reset) {
+        confetti.reset();
+      }
+    }
+
+    function resetConfetti() {
+      hasLaunchedConfetti = false;
     }
 
     // ═══════════════════════════ GRADUATION ═══════════════════════════
     function checkGraduation(progress) {
       var table = progress.currentTable;
+      var a = state.settings.adaptive;
+
       if (table >= MAX_TABLE) return false; // Already at max
-      var allFacts = ALL_SECONDS;
-      return allFacts.every(function (second) {
+
+      return ALL_SECONDS.every(function (second) {
         var s = getFactStats(table, second);
-        return s.shown >= 4 && s.mastery >= 0.80;
+        return isFactFluent(s, a);
       });
     }
 
@@ -3156,17 +3655,26 @@
     function getPriorityBreakdown(stats) {
       var a = state.settings.adaptive;
       var now = Date.now();
-      var recent = stats.recent.slice(-5);
+      var s = normalizeFactStatsV2(stats);
+      var status = getFactDisplayStatus(s, a);
+      var recent = s.recent.slice(-5);
       var recentAcc = recent.length ? recent.filter(function (r) { return r.isCorrect && !r.timeout; }).length / recent.length : 0;
-      var recentAvg = recent.length ? recent.reduce(function (sum, r) { return sum + r.responseMs; }, 0) / recent.length : (stats.avgMs || 0);
+      var recentAvg = recent.length ? recent.reduce(function (sum, r) { return sum + r.responseMs; }, 0) / recent.length : (s.avgMs || 0);
 
-      var overdueBoost = stats.cooldownUntil && now > stats.cooldownUntil ? clamp((now - stats.cooldownUntil) / a.overdueMs, 0, 2.2) : (stats.shown === 0 ? 1.8 : 0);
-      var timeoutBoost = stats.timeouts * 2.5;
+      var overdueBoost = s.cooldownUntil && now > s.cooldownUntil ? clamp((now - s.cooldownUntil) / a.overdueMs, 0, 2.2) : (s.shown === 0 ? 1.8 : 0);
+
+      var statusBoost = 0;
+      if (status === 'struggling') statusBoost = 3.0;
+      else if (status === 'learning') statusBoost = 1.2;
+      else if (status === 'empty') statusBoost = 1.8;
+      else if (status === 'fluent') statusBoost = -0.8;
+
+      var timeoutBoost = s.timeouts * 2.5;
       var slowPressure = Math.min((recentAvg || 0) / a.fluentMs, 2.4) * a.slowWeight;
-      var struggleBoost = (1 - stats.mastery) * 2.6 + (1 - recentAcc) * a.wrongWeight + slowPressure + (stats.slowOrWrongCount * 0.28);
-      var fluencyPenalty = stats.fastStreak >= 2 ? Math.min(stats.fastStreak * 0.38, 1.7) : 0;
-      var weight = clamp(0.9 + overdueBoost + timeoutBoost + struggleBoost - fluencyPenalty, 0.55, 9);
-      return { weight: weight, overdueBoost: overdueBoost, timeoutBoost: timeoutBoost, struggleBoost: struggleBoost, fluencyPenalty: fluencyPenalty };
+      var struggleBoost = (1 - s.mastery) * 2.6 + (1 - recentAcc) * a.wrongWeight + slowPressure + (s.slowOrWrongCount * 0.28);
+      var fluencyPenalty = s.fastStreak >= 2 ? Math.min(s.fastStreak * 0.38, 1.7) : 0;
+      var weight = clamp(0.9 + overdueBoost + timeoutBoost + struggleBoost + statusBoost - fluencyPenalty, 0.55, 9);
+      return { weight: weight, overdueBoost: overdueBoost, timeoutBoost: timeoutBoost, struggleBoost: struggleBoost, fluencyPenalty: fluencyPenalty, status: status };
     }
 
     function chooseNextProblem(blockedDisplayKey) {
@@ -3209,13 +3717,17 @@
         ALL_SECONDS.forEach(function (sec) {
           var stats = getFactStats(tbl, sec);
           if (stats.shown === 0) return; // Never seen — skip
-          // Weight by recency + weakness
-          var hoursSince = stats.lastSeenTs ? (now - stats.lastSeenTs) / 3600000 : 72;
+          // Weight by status + recency + weakness
+          var s = normalizeFactStatsV2(stats);
+          var status = getFactDisplayStatus(s, state.settings.adaptive);
+          var hoursSince = s.lastSeenTs ? (now - s.lastSeenTs) / 3600000 : 72;
           var recencyWeight = clamp(hoursSince / 2, 0, 4);
-          var recentReview = stats.recent.slice(-5);
+          var recentReview = s.recent.slice(-5);
           var reviewAcc = recentReview.length ? recentReview.filter(function (r) { return r.isCorrect && !r.timeout; }).length / recentReview.length : 1;
-          var weaknessWeight = (1 - stats.mastery) * 5 + (1 - reviewAcc) * 2 + stats.timeouts * 0.8;
-          var weight = clamp(0.8 + recencyWeight + weaknessWeight, 0.5, 10);
+          var weaknessWeight = (1 - s.mastery) * 5 + (1 - reviewAcc) * 2 + s.timeouts * 0.8;
+          var statusWeight = status === 'struggling' ? 2.5 : status === 'learning' ? 1.0 : -1.5;
+          if (status === 'fluent' && hasRecentWeakness(s, state.settings.adaptive)) statusWeight = 1.5;
+          var weight = clamp(0.8 + recencyWeight + weaknessWeight + statusWeight, 0.5, 10);
           var pres = choosePresentation(state.settings.orderMode, tbl, sec);
           reviewPool.push({
             table: tbl, second: sec,
@@ -3537,15 +4049,22 @@
       }
       recordSessionComplete(progress);
       updateTodaysQuizDisplay(progress);
+      updateTotalQuizDisplay(progress);
       updateBestSpeedDisplay(progress);
       var msg = 'Done! ' + round.correct + ' correct. ';
       if (graduated) {
+        var oldTable = progress.currentTable;
+        var newTable;
+
         graduate(progress);
         round.graduated = true;
-        var newTable = progress.currentTable;
+        newTable = progress.currentTable;
+
         msg += 'You graduated to \u00d7' + newTable + '! ';
-        el.graduateBanner.textContent = 'You mastered \u00d7' + (newTable - 1) + '! Now working on \u00d7' + newTable + '.';
+        el.graduateBanner.textContent = 'You mastered \u00d7' + oldTable + '! Now working on \u00d7' + newTable + '.';
         el.graduateBanner.classList.add('active');
+
+        celebrateVerticalStageAdvance(oldTable, newTable);
       }
       msg += 'Active through \u00d7' + model.maxSecond + '.';
       setStatus(el.roundStatus, msg, graduated ? 'good' : '');
@@ -3561,13 +4080,22 @@
 
     // ══════════════════════ MID-ROUND GRADUATION ══════════════════════
     function checkMidRoundGraduation() {
+      var oldTable;
+      var newTable;
+      var progress;
+
       if (!round) return;
-      var progress = loadProgress();
+
+      progress = loadProgress();
       if (progress.currentTable >= MAX_TABLE) return;
       if (!checkGraduation(progress)) return;
+
+      oldTable = progress.currentTable;
       graduate(progress);
-      var newTable = progress.currentTable;
-      showLevelUpToast('⬆ Moving up to ×' + newTable + '!');
+      newTable = progress.currentTable;
+
+      celebrateVerticalStageAdvance(oldTable, newTable);
+
       updatePracticeHeader();
       renderProgressGrid();
     }
@@ -3579,6 +4107,16 @@
       void el.levelupToast.offsetWidth;
       el.levelupToast.classList.add('show');
       setTimeout(function () { el.levelupToast.classList.remove('show'); }, 3200);
+    }
+
+    function celebrateVerticalStageAdvance(oldTable, newTable) {
+      if (newTable <= oldTable) {
+        return;
+      }
+
+      resetConfetti();
+      showLevelUpToast('Moving up to ×' + newTable + '!');
+      launchConfettiOnce();
     }
 
     // ═══════════════════════════ KEYPAD ═══════════════════════════
@@ -3599,22 +4137,26 @@
 
     // ═══════════════════════════ PROGRESS GRAPH ═══════════════════════════
     function isFactMastered(stats) {
-      return stats && stats.shown >= 4 && stats.mastery >= 0.80;
+      return stats && getFactDisplayStatus(stats, state.settings.adaptive) === 'fluent';
     }
 
     function getMasteryBreakdown(progress) {
       var fluent = 0;
       var inProgress = 0;
+      var struggling = 0;
       var factStats = progress.factStats || {};
 
       for (var t = STARTING_TABLE; t <= MAX_TABLE; t++) {
         for (var s = STARTING_TABLE; s <= MAX_TABLE; s++) {
           var key = t + 'x' + s;
           var stats = factStats[key] || blankStats();
-          if (isFactMastered(stats)) {
+          var status = getFactDisplayStatus(stats, state.settings.adaptive);
+
+          if (status === 'fluent') {
             fluent++;
-          } else if (stats.shown > 0) {
+          } else if (status === 'learning' || status === 'struggling') {
             inProgress++;
+            if (status === 'struggling') struggling++;
           }
         }
       }
@@ -3622,6 +4164,7 @@
       return {
         fluent: fluent,
         inProgress: inProgress,
+        struggling: struggling,
         total: MASTERY_TOTAL_FACTS
       };
     }
@@ -3634,7 +4177,7 @@
       var weightedProgress = Number(fluentCount || 0) + (Number(inProgressCount || 0) * MASTERY_IN_PROGRESS_WEIGHT);
       var progressPct = clamp(weightedProgress / MASTERY_TOTAL_FACTS, 0, 1);
       var accuracyScore = clamp(Number(accuracy || 0), 0, 1);
-      var speedScore = clamp(Number(fpm || 0) / Math.max(1, MASTERY_SPEED_TARGET_FPM), 0, 1);
+      var speedScore = clamp(Number(fpm || 0) / Math.max(1, getSpeedTargetFpm()), 0, 1);
       var qualityPct = (accuracyScore * 0.65) + (speedScore * 0.35);
       var progressComponent = MASTERY_PROGRESS_WEIGHT * progressPct;
       var performanceBonus = MASTERY_PERFORMANCE_BONUS_WEIGHT * qualityPct * progressPct;
@@ -3691,6 +4234,15 @@
       if (progress.sessionHistory.length > 200) progress.sessionHistory.shift();
       saveProgressLocalOnly(progress, 'record-session');
       return true;
+    }
+
+    function getSpeedTargetStatusClass(fpm) {
+      var target = Math.max(1, getSpeedTargetFpm());
+      var ratio = Number(fpm || 0) / target;
+
+      if (ratio >= 1) return 'speed-mastered';
+      if (ratio >= 0.75) return 'speed-learning';
+      return 'speed-struggling';
     }
 
     function renderProgressGraph() {
@@ -3941,12 +4493,15 @@
           var dateLabel = tooltipLabelForPoint(pt);
           var accLabel = (pt.accuracy != null) ? pt.accuracy + '%' : '';
           var fpmLabel = (pt.fpm != null) ? pt.fpm + ' facts/min' : '';
-          svg += '<circle class="graph-dot" cx="' + cx + '" cy="' + cy + '" r="3.5"></circle>';
+          var targetLabel = 'Target ' + getSpeedTargetFpm() + '/min';
+          var speedClass = getSpeedTargetStatusClass(pt.fpm);
+          svg += '<circle class="graph-dot ' + speedClass + '" cx="' + cx + '" cy="' + cy + '" r="3.5"></circle>';
           svg += '<circle class="graph-dot-hit" cx="' + cx + '" cy="' + cy + '" r="10" fill="transparent"'
             + ' data-score="' + pt.masteryScore + '"'
             + ' data-date="' + dateLabel + '"'
             + ' data-acc="' + accLabel + '"'
-            + ' data-fpm="' + fpmLabel + '"></circle>';
+            + ' data-fpm="' + fpmLabel + '"'
+            + ' data-target="' + targetLabel + '"></circle>';
         });
       }
 
@@ -3960,9 +4515,10 @@
       }
 
       svg += '</svg>';
+      var chartTarget = getSpeedTargetFpm();
       var chartNote = graphShowAllResults
-        ? 'All saved results - score is out of 100'
-        : 'Recent ' + GRAPH_DEFAULT_VISIBLE_RESULTS + ' quiz results - score is out of 100';
+        ? 'All saved results - score is out of 100 - speed target: ' + chartTarget + ' facts/min'
+        : 'Recent ' + GRAPH_DEFAULT_VISIBLE_RESULTS + ' quiz results - score is out of 100 - speed target: ' + chartTarget + ' facts/min';
       el.progressGraph.innerHTML = scoreCardHtml + svg + '<div class="mastery-chart-note">' + chartNote + '</div>';
     }
 
@@ -3996,28 +4552,16 @@
             // Only lock if never seen - a fact seen before must never revert to locked
             var preStats = getFactStats(t, s);
             if (preStats.shown > 0) {
-              var cumAcc2 = preStats.correct / Math.max(1, preStats.shown);
-              var spOk2 = !preStats.avgMs || preStats.avgMs <= state.settings.adaptive.fluentMs * 1.4;
-              var g2 = preStats.fastStreak >= 3 || (preStats.correct >= 3 && cumAcc2 >= 0.65 && spOk2);
-              cls += g2 ? ' fluent' : ' learning';
+              var status2 = getFactDisplayStatus(preStats, state.settings.adaptive);
+              if (status2 === 'empty') status2 = 'learning';
+              cls += ' ' + status2;
             } else {
               cls += ' locked';
             }
           } else {
             var stats = getFactStats(t, s);
             if (t === currentTable && s <= activeMax) cls += ' current-focus';
-
-            // Green: streak of 3+ correct-and-fast, OR has 3+ correct total with >=65%
-            // cumulative accuracy AND average speed within 1.4x the fluent threshold.
-            // Speed is required on both paths so green always means fast AND accurate.
-            if (stats.shown === 0) {
-              cls += ' empty';
-            } else {
-              var cumAcc = stats.correct / Math.max(1, stats.shown);
-              var speedOk = !stats.avgMs || stats.avgMs <= state.settings.adaptive.fluentMs * 1.4;
-              var isGreen = stats.fastStreak >= 3 || (stats.correct >= 3 && cumAcc >= 0.65 && speedOk);
-              cls += isGreen ? ' fluent' : ' learning';
-            }
+            cls += ' ' + getFactDisplayStatus(stats, state.settings.adaptive);
           }
 
           html += '<span class="pg-cell' + cls + '" title="' + title + '" aria-label="' + title + '">' + s + '</span>';
@@ -4049,6 +4593,7 @@
       updateStreakMeter(round ? round.streak : 0);
       updateSpeedUi(round ? getLiveFpm() : 0);
       updateTodaysQuizDisplay(uiProgress);
+      updateTotalQuizDisplay(uiProgress);
       updateBestSpeedDisplay(uiProgress);
       if (el.currentStreakValue) el.currentStreakValue.textContent = String(round ? round.streak : 0);
       if (el.personalBestValue) {
@@ -4074,6 +4619,8 @@
       var deleteCloud = options.deleteCloud === true;
 
       stopRound(false);
+      stopConfetti();
+      resetConfetti();
 
       if (SHARED_DEVICE_MODE) {
         clearWorkingProgress();
@@ -4089,6 +4636,7 @@
 
       graphShowAllResults = false;
       refreshProgressUi();
+      syncSpeedTargetSlider();
 
       if (!deleteCloud && syncState.signedIn) {
         signOutOfSync();
@@ -4116,6 +4664,7 @@
             if (SHARED_DEVICE_MODE) {
               clearWorkingProgress();
               refreshProgressUi();
+              syncSpeedTargetSlider();
               setSyncStatus('synced', 'Google progress reset');
             } else {
               setSyncStatus('synced', 'Device and cloud progress reset');
@@ -4153,6 +4702,8 @@
       if (!isTouch) node.focus();
     }
 
+    var FIXED_BAR_GRADIENT = 'linear-gradient(90deg, #2d8cff 0%, #f2d23b 35%, #f28c28 65%, #d72626 100%)';
+
     function progressiveGradient(pct) {
       // Map fill percentage to a progressive 4-color gradient.
       // Colors reveal sequentially: blue -> yellow -> orange -> red
@@ -4181,6 +4732,14 @@
       return 'linear-gradient(90deg,' + C[0] + ' 0%,' + C[1] + ' 33%,' + C[2] + ' 66%,' + C[3] + ' ' + s + '%,' + C[3] + ' 100%)';
     }
 
+    function applyFixedBarGradient(fillEl, trackEl) {
+      if (!fillEl || !trackEl) return;
+      fillEl.style.backgroundImage = FIXED_BAR_GRADIENT;
+      fillEl.style.backgroundRepeat = 'no-repeat';
+      fillEl.style.backgroundPosition = 'left center';
+      fillEl.style.backgroundSize = trackEl.clientWidth + 'px 100%';
+    }
+
     function updateStreakMeter(streak) {
       if (!el.streakFill || !el.streakFlame) return;
       var rawStreak = streak || 0;
@@ -4188,16 +4747,16 @@
       var value = clamp(rawStreak, 0, 20);
       var pct = (value / 20) * 100;
       el.streakFill.style.width = pct.toFixed(1) + '%';
-      el.streakFill.style.background = progressiveGradient(pct);
+      applyFixedBarGradient(el.streakFill, el.streakFill.parentNode);
       el.streakFlame.classList.toggle('hot', value >= 20);
     }
 
     function updateFpmMeter(fpm) {
       if (!el.fpmFill || !el.fpmRunner) return;
-      var target = Math.max(1, Number(SPEED_FULL_BAR_FPM) || 30);
+      var target = Math.max(1, getSpeedTargetFpm());
       var pct = Math.max(0, Math.min(100, (fpm / target) * 100));
       el.fpmFill.style.width = pct.toFixed(1) + '%';
-      el.fpmFill.style.background = progressiveGradient(pct);
+      applyFixedBarGradient(el.fpmFill, el.fpmFill.parentNode);
       el.fpmRunner.classList.toggle('fast', pct >= 100);
     }
 
@@ -4358,6 +4917,48 @@
       setupSystemThemeListener();
     }
 
+    function syncSpeedTargetSlider() {
+      var target;
+      var index;
+
+      if (!el.speedTargetSlider || !el.speedTargetValue) return;
+
+      target = getSpeedTargetFpm();
+      index = getSpeedTargetIndex(target);
+
+      el.speedTargetSlider.value = String(index);
+      el.speedTargetValue.textContent = String(target);
+    }
+
+    function setSpeedTargetFpm(target) {
+      var progress = loadProgress();
+      var validTarget = getValidSpeedTargetFpm(target);
+
+      progress.speedTargetFpm = validTarget;
+      progress.speedTargetUpdatedAtMs = nowMs();
+
+      saveProgressToStorage(progress, { reason: 'speed-target-change' });
+
+      if (el.speedTargetValue) el.speedTargetValue.textContent = String(validTarget);
+
+      updateSpeedUi(round ? getLiveFpm() : 0);
+      refreshProgressUi();
+
+      if (el.progressGraph) renderProgressGraph();
+    }
+
+    function handleSpeedTargetSliderInput() {
+      var index;
+      var target;
+
+      if (!el.speedTargetSlider) return;
+
+      index = Number(el.speedTargetSlider.value) || 0;
+      target = SPEED_TARGET_OPTIONS[index] || DEFAULT_SPEED_TARGET_FPM;
+
+      setSpeedTargetFpm(target);
+    }
+
     function closeSettingsMenu() {
       if (el.settingsDropdown) el.settingsDropdown.classList.remove('open');
       var normal = document.getElementById('resetNormal');
@@ -4417,6 +5018,29 @@
           e.stopPropagation();
           setHapticsEnabled(!getHapticsEnabled());
         });
+        el.hapticsToggleBtn.addEventListener('keydown', function (e) {
+          if (e.target !== el.hapticsToggleBtn) return;
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            e.stopPropagation();
+            setHapticsEnabled(!getHapticsEnabled());
+          }
+        });
+      }
+      if (el.speedTargetSlider) {
+        el.speedTargetSlider.addEventListener('click', function (e) {
+          e.stopPropagation();
+        });
+
+        el.speedTargetSlider.addEventListener('input', function (e) {
+          e.stopPropagation();
+          handleSpeedTargetSliderInput();
+        });
+
+        el.speedTargetSlider.addEventListener('change', function (e) {
+          e.stopPropagation();
+          handleSpeedTargetSliderInput();
+        });
       }
       document.addEventListener('click', function (e) {
         if (e.target && e.target.id === 'masteryInfoBtn') {
@@ -4439,6 +5063,7 @@
           var open = el.settingsDropdown.classList.toggle('open');
           if (open) {
             updateHapticsMenuText();
+            syncSpeedTargetSlider();
             document.getElementById('resetNormal').style.display = '';
             document.getElementById('resetConfirm').style.display = 'none';
           }
@@ -4546,10 +5171,12 @@
         var date  = hit.getAttribute('data-date');
         var acc   = hit.getAttribute('data-acc');
         var fpm   = hit.getAttribute('data-fpm');
+        var target = hit.getAttribute('data-target');
         var lines = '<span class="tt-score">' + score + '</span>';
         lines += date;
         if (acc)  lines += ' &middot; ' + acc;
         if (fpm)  lines += ' &middot; ' + fpm;
+        if (target) lines += ' &middot; ' + target;
         tooltip.innerHTML = lines;
         tooltip.classList.add('visible');
         var tx = clientX + 14;
@@ -4593,8 +5220,13 @@
       cacheDom();
       initTheme();
       updateHapticsMenuText();
+      syncSpeedTargetSlider();
       updateMobileMode();
       window.addEventListener('resize', updateMobileMode);
+      window.addEventListener('resize', function () {
+        applyFixedBarGradient(el.streakFill, el.streakFill && el.streakFill.parentNode);
+        applyFixedBarGradient(el.fpmFill, el.fpmFill && el.fpmFill.parentNode);
+      });
 
       // Shared-device mode: clear only student working progress on startup.
       // Do not clear the Google token/session here; refresh should restore a valid token
