@@ -359,6 +359,7 @@
     }
     .pg-legend .swatch.ln { background: var(--cell-learning); }
     .pg-legend .swatch.st { background: var(--cell-struggling); }
+    .pg-legend .swatch.emp { background: var(--cell-empty); }
     .pg-legend .swatch.lk { background: var(--cell-locked); opacity: 0.5; }
 
     /* ── Answer glow ── */
@@ -1471,6 +1472,7 @@
             <span><span class="swatch nr"></span> Almost There</span>
             <span><span class="swatch ln"></span> Learning</span>
             <span><span class="swatch st"></span> Needs Practice</span>
+            <span><span class="swatch emp"></span> Not Started</span>
             <span><span class="swatch lk"></span> Locked</span>
           </div>
           <div class="progress-graph-wrap">
@@ -1516,7 +1518,7 @@
         <li>Red facts need extra review because of a recent wrong answer, timeout, or slow response.</li>
         <li>A green fact can move back down if it later shows weakness, but one typo will not erase your progress.</li>
         <li>Mastered and review-soon facts count fully, in-progress facts count partly, and accuracy and speed add a small bonus.</li>
-        <li>A very strong round - high accuracy and fast speed - can earn a bonus graduation even if not all facts are fully green yet.</li>
+        <li>A very strong round - high accuracy and fast speed - can earn a bonus graduation once every fact in the table has been unlocked and answered at least once, even if not all facts are fully green yet.</li>
       </ul>
       <p>The graph shows your most recent 10 quiz results by default. Use "Show all results" to see your saved Google progress.</p>
       <p>The chart zooms in to show progress clearly, but the mastery score is always out of 100.</p>
@@ -4174,6 +4176,7 @@
       var ready = 0;
       var learning = 0;
       var struggling = 0;
+      var empty = 0;
 
       ALL_SECONDS.forEach(function (second) {
         var s = getFactStats(table, second);
@@ -4191,6 +4194,7 @@
           struggling += 1;
         } else {
           learning += 1;
+          if (status === 'empty' || s.shown <= 0) empty += 1;
           if (nearReady) ready += 1;
         }
       });
@@ -4201,6 +4205,8 @@
         ready: ready,
         learning: learning,
         struggling: struggling,
+        empty: empty,
+        seen: ALL_SECONDS.length - empty,
         total: ALL_SECONDS.length
       };
     }
@@ -4222,10 +4228,20 @@
 
     function checkGraduation(progress) {
       var readiness;
+      var model;
+      var finalSecond;
 
       if (progress.currentTable >= MAX_TABLE) return false; // Already at max
 
       readiness = getTableGraduationReadiness(progress);
+      model = getActiveModel(progress);
+      finalSecond = ALL_SECONDS[ALL_SECONDS.length - 1];
+
+      // Do not leave a row behind with a skipped fact. The student must first
+      // unlock every fact in the current table and answer each one at least once.
+      if (model.maxSecond < finalSecond || readiness.empty > 0) {
+        return false;
+      }
 
       if (readiness.struggling === 0 && readiness.mastered >= GRADUATION_MASTERED_REQUIRED) {
         return true;
@@ -4325,41 +4341,57 @@
       }
 
       var reviewPool = [];
+      var catchUpPool = [];
       masteredTables.forEach(function (tbl) {
         ALL_SECONDS.forEach(function (sec) {
           var stats = getFactStats(tbl, sec);
-          if (stats.shown === 0) return; // Never seen — skip
-          // Weight by status + recency + weakness
           var s = normalizeFactStatsV2(stats);
           var status = getFactDisplayStatus(s, state.settings.adaptive);
           var hoursSince = s.lastSeenTs ? (now - s.lastSeenTs) / 3600000 : 72;
           var recencyWeight = clamp(hoursSince / 2, 0, 4);
           var recentReview = s.recent.slice(-5);
-          var reviewAcc = recentReview.length ? recentReview.filter(function (r) { return r.isCorrect && !r.timeout; }).length / recentReview.length : 1;
+          var reviewAcc = recentReview.length ? recentReview.filter(function (r) { return r.isCorrect && !r.timeout; }).length / recentReview.length : (s.shown === 0 ? 0 : 1);
           var weaknessWeight = (1 - s.mastery) * 5 + (1 - reviewAcc) * 2 + s.timeouts * 0.8;
-          var statusWeight = status === 'struggling' ? 2.5 : status === 'learning' ? 1.0 : status === 'review' ? 1.4 : -1.5;
+          var statusWeight = status === 'struggling' ? 2.5 : status === 'learning' ? 1.0 : status === 'near-ready' ? 1.2 : status === 'review' ? 1.4 : -1.5;
+          var weight;
+          var pres;
+          var item;
+
+          // Older saved progress may contain facts from a past table that were never
+          // answered. Do not skip them forever; send them through a catch-up pool.
+          if (s.shown === 0) statusWeight = 4.0;
           if ((status === 'fluent' || status === 'review') && hasRecentWeakness(s, state.settings.adaptive)) statusWeight = 1.5;
-          var weight = clamp(0.8 + recencyWeight + weaknessWeight + statusWeight, 0.5, 10);
-          var pres = choosePresentation(state.settings.orderMode, tbl, sec);
-          reviewPool.push({
+
+          weight = clamp(0.8 + recencyWeight + weaknessWeight + statusWeight, 0.5, 12);
+          pres = choosePresentation(state.settings.orderMode, tbl, sec);
+          item = {
             table: tbl, second: sec,
             left: pres.left, right: pres.right,
             answer: tbl * sec,
             weight: weight,
             familyKey: tbl + 'x' + sec,
             displayKey: pres.left + 'x' + pres.right
-          });
+          };
+
+          if (s.shown === 0 || status === 'learning' || status === 'near-ready' || status === 'struggling') {
+            catchUpPool.push(item);
+          } else {
+            reviewPool.push(item);
+          }
         });
       });
 
+      catchUpPool = catchUpPool.filter(function (p) { return p.displayKey !== blockedDisplayKey; });
       reviewPool = reviewPool.filter(function (p) { return p.displayKey !== blockedDisplayKey; });
 
-      // Decide which pool to draw from
-      var useReview = reviewPool.length > 0 && Math.random() < reviewPct;
-      var pool = useReview ? reviewPool : currentPool;
+      // Decide which pool to draw from. Catch-up fixes older progress where a past row
+      // was advanced before every fact in that row had been answered.
+      var useCatchUp = catchUpPool.length > 0 && Math.random() < Math.max(reviewPct, 0.35);
+      var useReview = !useCatchUp && reviewPool.length > 0 && Math.random() < reviewPct;
+      var pool = useCatchUp ? catchUpPool : (useReview ? reviewPool : currentPool);
 
       // If chosen pool is empty after filtering, fall back
-      if (!pool.length) pool = useReview ? currentPool : (reviewPool.length ? reviewPool : currentPool);
+      if (!pool.length) pool = useCatchUp ? currentPool : (useReview ? currentPool : (catchUpPool.length ? catchUpPool : (reviewPool.length ? reviewPool : currentPool)));
       if (!pool.length) {
         // Ultimate fallback
         var sec = model.activeFacts[0] || 2;
@@ -4374,7 +4406,7 @@
       var chosen = weightedPick(pool);
       return {
         problem: chosen,
-        fromReview: useReview,
+        fromReview: useReview || useCatchUp,
         model: model
       };
     }
@@ -5378,8 +5410,18 @@
             }
           } else {
             var stats = getFactStats(t, s);
+            var displayStatus;
             if (t === currentTable && s <= activeMax) cls += ' current-focus';
-            cls += ' ' + getFactDisplayStatus(stats, state.settings.adaptive);
+            displayStatus = getFactDisplayStatus(stats, state.settings.adaptive);
+
+            // Past rows should not show unexplained pale cells. If old saved
+            // progress skipped a fact, show it as locked until catch-up practice
+            // gives it real practice data.
+            if (t < currentTable && displayStatus === 'empty') {
+              cls += ' locked';
+            } else {
+              cls += ' ' + displayStatus;
+            }
           }
 
           html += '<span class="pg-cell' + cls + '" title="' + title + '" aria-label="' + title + '">' + s + '</span>';
