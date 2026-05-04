@@ -829,8 +829,8 @@
     }
 
     .speed-target-marks {
-      display: grid;
-      grid-template-columns: 1fr repeat(3, 2fr) 1fr;
+      display: flex;
+      justify-content: space-between;
       width: calc(100% - var(--speed-target-thumb-size));
       margin: 0.18rem calc(var(--speed-target-thumb-size) / 2) 0;
       font-size: 0.66rem;
@@ -841,6 +841,7 @@
     .speed-target-marks span {
       text-align: center;
       line-height: 1.2;
+      flex: 0 0 auto;
     }
 
     .speed-target-note {
