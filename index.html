@@ -1348,8 +1348,13 @@
               </span>
               <span class="settings-check" aria-hidden="true"></span>
             </button>
-            <button type="button" class="settings-item settings-item-row" id="settingsSignOutBtn" style="display:none;">
-              <span class="settings-icon" aria-hidden="true">x</span>
+            <button type="button" class="settings-item settings-item-row hidden" id="settingsSignOutBtn">
+              <span class="settings-icon" aria-hidden="true">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M18 6L6 18"></path>
+                  <path d="M6 6l12 12"></path>
+                </svg>
+              </span>
               <span class="settings-text">
                 <span class="settings-title">Sign out of Google sync</span>
                 <span class="settings-subtitle">Progress saves to your Google account. Sign out clears this device.</span>
@@ -2632,7 +2637,7 @@
       if (el.headerDriveSyncText) el.headerDriveSyncText.textContent = getDriveSyncText(status, text);
       if (el.headerGoogleUserInfo) el.headerGoogleUserInfo.title = status === 'error' ? getSyncErrorDetail(syncState.lastError) : text;
       if (el.settingsSyncStatusText) el.settingsSyncStatusText.textContent = status === 'error' ? getSyncErrorDetail(syncState.lastError) : text;
-      if (el.settingsSignOutBtn) el.settingsSignOutBtn.style.display = syncState.signedIn ? 'block' : 'none';
+      if (el.settingsSignOutBtn) el.settingsSignOutBtn.classList.toggle('hidden', !syncState.signedIn);
     }
 
     // ═══════════════════════════ DRIVE FILE SHAPE ═══════════════════════════
