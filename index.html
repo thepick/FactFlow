@@ -546,21 +546,6 @@
     .mastery-stat-piece {
       white-space: nowrap;
     }
-    .mastery-avg-stats {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 0.15rem 0.45rem;
-      font-size: 0.66rem;
-      color: var(--color-text-faint);
-      letter-spacing: 0.01em;
-      margin-top: 0.3rem;
-      padding-top: 0.3rem;
-      border-top: 1px solid color-mix(in srgb, var(--color-text) 6%, transparent);
-    }
-    .mastery-avg-piece {
-      white-space: nowrap;
-    }
     .mastery-formula-note {
       display: none;
     }
@@ -5383,9 +5368,6 @@
 
       // Score card above the graph
       var latest = history.length ? history[history.length - 1] : null;
-      var currentBreakdown = getMasteryBreakdown(progress);
-      var currentMastered = currentBreakdown.fluent;
-      var currentInProgress = currentBreakdown.inProgress;
       var scoreCardHtml = '';
       if (latest) {
         var latestScore = getStoredMasteryScore(latest);
@@ -5393,13 +5375,7 @@
         scoreCardHtml += '<span class="mastery-score-head"><span class="mastery-score-label">Times Table Mastery Score</span><button type="button" class="mastery-info-btn" id="masteryInfoBtn" aria-label="How the mastery score works">?</button></span>';
         scoreCardHtml += '<span class="mastery-big-num">' + latestScore + '</span>';
         scoreCardHtml += '<div class="mastery-stats">';
-        scoreCardHtml += '<span class="mastery-stat-piece">Mastered: ' + currentMastered + '/' + MASTERY_TOTAL_FACTS + '</span>';
-        scoreCardHtml += '<span class="mastery-stat-piece">In progress: ' + currentInProgress + '</span>';
-        if (latest.accuracy != null) scoreCardHtml += '<span class="mastery-stat-piece">Accuracy: ' + latest.accuracy + '%</span>';
-        if (latest.fpm != null) scoreCardHtml += '<span class="mastery-stat-piece">Speed: ' + latest.fpm + '/min</span>';
-        scoreCardHtml += '</div>';
-        scoreCardHtml += '<div class="mastery-avg-stats">';
-        scoreCardHtml += '<span class="mastery-avg-piece">' + averageLabel + ' ' + averages.fpm + ' facts/min &middot; Acc ' + averages.acc + '%</span>';
+        scoreCardHtml += '<span class="mastery-stat-piece">' + averageLabel + ' ' + averages.fpm + ' facts/min &middot; Acc ' + averages.acc + '%</span>';
         scoreCardHtml += '</div>';
         scoreCardHtml += '</div>';
       } else {
