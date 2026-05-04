@@ -99,9 +99,32 @@
     .settings-item.active { background: var(--color-primary-highlight); color: var(--color-text); font-weight: 800; }
     .user-info { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); background: var(--color-surface-2); border-radius: var(--radius-lg); border: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent); }
     .practice-layout { display: grid; grid-template-columns: minmax(0, 1fr) 410px; gap: var(--space-4); align-items: stretch; }
-    .problem-area { padding: var(--space-5) 0 var(--space-3); text-align: center; }
+    .problem-area { padding: var(--space-5) 0 var(--space-3); text-align: center; position: relative; }
     .problem-text { font-size: clamp(2.4rem, 6vw, 4.5rem); font-weight: 700; letter-spacing: -0.03em; }
     .answer-wrap { max-width: 260px; margin: 0 auto; position: relative; }
+    .cooldown-stack {
+      position: absolute;
+      top: calc(100% + 0.45rem);
+      left: 50%;
+      width: min(360px, 92vw);
+      transform: translateX(-50%);
+      display: grid;
+      gap: 0.35rem;
+      pointer-events: none;
+      z-index: 30;
+    }
+    .answer-wrap .cooldown-banner,
+    .answer-wrap .cooldown-hint {
+      margin-top: 0;
+      box-shadow: var(--shadow-md);
+    }
+    .answer-wrap .cooldown-hint {
+      padding: 0.5rem 0.75rem;
+      background: var(--color-surface);
+      border: 1px solid color-mix(in srgb, var(--color-text) 12%, transparent);
+      border-radius: var(--radius-lg);
+      color: var(--color-text-muted);
+    }
     .answer-input { text-align: center; font-size: clamp(1.6rem, 4vw, 2.5rem); font-weight: 700; min-height: 64px; }
     .answer-input:disabled { opacity: 0.45; }
     .feedback-pill { position: absolute; right: 0.6rem; top: 50%; transform: translateY(-50%); border-radius: var(--radius-full); padding: 0.3rem 0.55rem; font-size: var(--text-xs); font-weight: 700; opacity: 0; transition: opacity 150ms; pointer-events: none; }
@@ -125,15 +148,54 @@
     .timeout-overlay.active { display: block; }
     .timeout-overlay .answer-reveal { font-size: 1.5rem; font-weight: 700; margin: var(--space-2) 0; }
     .timeout-overlay .type-prompt { font-size: var(--text-sm); color: var(--color-text-muted); margin-bottom: var(--space-2); }
-    .new-fact-label { display: none; font-size: var(--text-xs); font-weight: 700; color: var(--color-primary); text-align: center; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: var(--space-1); min-height: 1.2em; }
-    .new-fact-label.visible { display: block; }
+    .new-fact-label {
+      display: block;
+      position: absolute;
+      top: 0.25rem;
+      left: 0;
+      right: 0;
+      opacity: 0;
+      pointer-events: none;
+      font-size: var(--text-xs);
+      font-weight: 700;
+      color: var(--color-primary);
+      text-align: center;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 0;
+      min-height: 0;
+      transform: translateY(-0.15rem);
+      transition: opacity 140ms ease, transform 140ms ease;
+      z-index: 2;
+    }
+    .new-fact-label.visible { opacity: 1; transform: translateY(0); }
     .cooldown-hint { display: none; font-size: var(--text-sm); color: var(--color-text-muted); text-align: center; margin-top: var(--space-2); font-style: italic; }
     .cooldown-hint.active { display: block; }
     .cooldown-banner { display: none; text-align: center; padding: var(--space-2) var(--space-3); background: var(--color-error-highlight); color: var(--color-error); border-radius: var(--radius-lg); font-weight: 700; font-size: var(--text-sm); margin-top: var(--space-2); }
     .cooldown-banner.active { display: block; }
-    .graduate-banner { display: none; text-align: center; padding: var(--space-3) var(--space-4); background: var(--color-success-highlight); color: var(--color-success); border-radius: var(--radius-lg); font-weight: 700; font-size: var(--text-base); margin-bottom: var(--space-3); animation: popIn 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
-    .graduate-banner.active { display: block; }
+    .graduate-banner {
+      display: none;
+      position: fixed;
+      top: 72px;
+      left: 50%;
+      width: min(92vw, 680px);
+      transform: translateX(-50%) translateY(-6px);
+      text-align: center;
+      padding: var(--space-3) var(--space-4);
+      background: var(--color-success-highlight);
+      color: var(--color-success);
+      border: 1px solid color-mix(in srgb, var(--color-success) 26%, transparent);
+      border-radius: var(--radius-lg);
+      font-weight: 700;
+      font-size: var(--text-base);
+      margin-bottom: 0;
+      box-shadow: var(--shadow-md);
+      pointer-events: none;
+      z-index: 1001;
+    }
+    .graduate-banner.active { display: block; animation: toastPopIn 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
     @keyframes popIn { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+    @keyframes toastPopIn { 0% { transform: translateX(-50%) translateY(-6px) scale(0.98); opacity: 0; } 100% { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; } }
     .hidden { display: none !important; }
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border-width: 0; }
     /* ── Progress Grid ── */
@@ -885,16 +947,10 @@
       line-height: 1.25;
     }
 
-    .graph-dot.speed-mastered {
-      fill: var(--cell-fluent);
-    }
-
-    .graph-dot.speed-learning {
-      fill: var(--cell-learning);
-    }
-
+    .graph-dot.speed-mastered,
+    .graph-dot.speed-learning,
     .graph-dot.speed-struggling {
-      fill: var(--cell-struggling);
+      fill: var(--color-primary);
     }
     /* ──── Level-up toast ──── */
     .levelup-toast {
@@ -1319,14 +1375,16 @@
               <label class="sr-only" for="answerInput">Type answer</label>
               <input id="answerInput" class="answer-input" inputmode="none" autocomplete="off" placeholder="?" readonly disabled />
               <div class="feedback-pill" id="feedbackPill">Correct</div>
+              <div class="cooldown-stack" aria-live="polite">
+                <div class="cooldown-banner" id="cooldownBanner"></div>
+                <div class="cooldown-hint" id="cooldownHint"></div>
+              </div>
             </div>
             <div class="timeout-overlay" id="timeoutOverlay">
               <div class="answer-reveal" id="timeoutAnswer"></div>
               <p class="subtle">Type the answer shown to continue</p>
               <input id="timeoutInput" class="answer-input" inputmode="none" autocomplete="off" placeholder="Type it" readonly style="max-width:180px;margin:0 auto;" />
             </div>
-            <div class="cooldown-banner" id="cooldownBanner"></div>
-            <div class="cooldown-hint" id="cooldownHint"></div>
             <div class="keypad" aria-label="Number keypad" style="margin-top:var(--space-3);">
               <button type="button" class="key-btn" data-key="1">1</button>
               <button type="button" class="key-btn" data-key="2">2</button>
@@ -1520,6 +1578,7 @@
 
     var graphShowAllResults = false; // Toggle: show all saved quiz results instead of only recent results
     var startBtnCooldown = null; // Post-round delay interval
+    var practiceRenderTimer = null; // Defers non-critical grid/graph redraws so the next fact appears immediately
 
     // Google Drive sync state.
     var syncState = {
@@ -3564,12 +3623,29 @@
       return progress.factStats[key] || blankStats();
     }
 
-    function updateFactStats(table, second, isCorrect, responseMs, wasTimeout) {
+    function schedulePracticeRender() {
+      if (practiceRenderTimer) return;
+
+      function runDeferredPracticeRender() {
+        practiceRenderTimer = null;
+        if (el.progressGrid) renderProgressGrid();
+        if (el.progressGraph) renderProgressGraph();
+      }
+
+      if (window.requestAnimationFrame) {
+        practiceRenderTimer = window.requestAnimationFrame(runDeferredPracticeRender);
+      } else {
+        practiceRenderTimer = setTimeout(runDeferredPracticeRender, 0);
+      }
+    }
+
+    function updateFactStats(table, second, isCorrect, responseMs, wasTimeout, options) {
       var progress = loadProgress();
       var key = table + 'x' + second;
       if (!progress.factStats[key]) progress.factStats[key] = blankStats();
       var s = progress.factStats[key];
       var now = Date.now();
+      options = options || {};
 
       s.shown++;
       if (wasTimeout) s.timeouts++;
@@ -3614,8 +3690,12 @@
       }
 
       saveProgressToStorage(progress);
-      if (el.progressGrid) renderProgressGrid();
-      if (el.progressGraph) renderProgressGraph();
+      if (options.deferRender) {
+        schedulePracticeRender();
+      } else {
+        if (el.progressGrid) renderProgressGrid();
+        if (el.progressGraph) renderProgressGraph();
+      }
     }
 
     function blankStats() {
@@ -3908,6 +3988,8 @@
     // ═══════════════════════════ CONFETTI ═══════════════════════════
     function launchConfettiOnce(colors) {
       var confettiColors;
+      var duration;
+      var endAt;
 
       if (hasLaunchedConfetti) {
         return;
@@ -3934,17 +4016,40 @@
         confettiTimer = null;
       }
 
-      confetti({
-        particleCount: 70,
-        startVelocity: 28,
-        spread: 260,
-        ticks: 55,
-        origin: {
-          x: 0.5,
-          y: 0.2
-        },
-        colors: confettiColors
-      });
+      duration = 1800;
+      endAt = Date.now() + duration;
+
+      function fireSideConfetti() {
+        confetti({
+          particleCount: 36,
+          angle: 60,
+          spread: 68,
+          startVelocity: 42,
+          ticks: 95,
+          origin: { x: 0.06, y: 0.82 },
+          colors: confettiColors
+        });
+
+        confetti({
+          particleCount: 36,
+          angle: 120,
+          spread: 68,
+          startVelocity: 42,
+          ticks: 95,
+          origin: { x: 0.94, y: 0.82 },
+          colors: confettiColors
+        });
+      }
+
+      fireSideConfetti();
+      confettiTimer = setInterval(function () {
+        if (Date.now() >= endAt) {
+          clearInterval(confettiTimer);
+          confettiTimer = null;
+          return;
+        }
+        fireSideConfetti();
+      }, 260);
     }
 
     function stopConfetti() {
@@ -4409,7 +4514,7 @@
       if (numeric === expected) {
         clearTimeout(timeoutTimer);
         var ms = Date.now() - round.problemStartTime;
-        updateFactStats(round.currentProblem.table, round.currentProblem.second, true, ms, false);
+        updateFactStats(round.currentProblem.table, round.currentProblem.second, true, ms, false, { deferRender: true });
         round.correct++;
         round.attempted++;
         round.streak++;
@@ -4423,7 +4528,7 @@
         buzz(15);
         flashGlow('good');
         nextProblem();
-      } else if (String(expected).startsWith(raw)) {
+      } else if (raw.length < String(expected).length) {
         hideFeedback();
       } else {
         if (!round.hasRecordedWrong) {
@@ -4539,7 +4644,7 @@
       celebrateVerticalStageAdvance(oldTable, newTable);
 
       updatePracticeHeader();
-      renderProgressGrid();
+      schedulePracticeRender();
     }
 
     function showLevelUpToast(msg) {
