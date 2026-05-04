@@ -45,7 +45,7 @@
       touch-action: manipulation;
     }
     input, select { width: 100%; min-height: 42px; border: 1px solid color-mix(in srgb, var(--color-text) 12%, transparent); background: var(--color-surface-2); border-radius: var(--radius-md); padding: 0.65rem 0.8rem; }
-    .app { max-width: 1060px; margin: 0 auto; padding: var(--space-4); display: grid; gap: var(--space-4); }
+    .app { max-width: 1220px; margin: 0 auto; padding: var(--space-4); display: grid; gap: var(--space-4); }
     .header { background: linear-gradient(135deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 75%, black)); color: var(--color-text-inverse); border-radius: var(--radius-xl); padding: var(--space-3) var(--space-5); display: flex; justify-content: space-between; align-items: center; box-shadow: var(--shadow-md); }
     .brand { display: flex; gap: var(--space-3); align-items: center; }
     .logo { width: 38px; height: 38px; border-radius: var(--radius-full); background: transparent; display: grid; place-items: center; flex: 0 0 auto; overflow: hidden; line-height: 0; align-self: center; }
@@ -103,7 +103,7 @@
     .bar-label-meta { font-size: var(--text-xs); font-weight: 700; color: var(--color-text-muted); }
     .settings-item.active { background: var(--color-primary-highlight); color: var(--color-text); font-weight: 800; }
     .user-info { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); background: var(--color-surface-2); border-radius: var(--radius-lg); border: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent); }
-    .practice-layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: var(--space-4); align-items: stretch; }
+    .practice-layout { display: grid; grid-template-columns: minmax(0, 1fr) 410px; gap: var(--space-4); align-items: stretch; }
     .problem-area { padding: var(--space-5) 0 var(--space-3); text-align: center; }
     .problem-text { font-size: clamp(2.4rem, 6vw, 4.5rem); font-weight: 700; letter-spacing: -0.03em; }
     .answer-wrap { max-width: 260px; margin: 0 auto; position: relative; }
@@ -244,9 +244,11 @@
       box-shadow: inset 0 1px 0 rgba(255,255,255,0.26), 0 0 0 3px rgba(1, 105, 111, 0.15), 0 2px 5px rgba(0,0,0,0.10);
     }
     .pg-legend {
-      display: flex;
-      gap: var(--space-3);
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: repeat(3, auto);
+      justify-content: center;
+      align-items: center;
+      gap: 0.55rem 1rem;
       margin-top: var(--space-3);
       font-size: var(--text-xs);
       color: var(--color-text-muted);
@@ -255,6 +257,7 @@
       display: flex;
       align-items: center;
       gap: 5px;
+      white-space: nowrap;
     }
     .pg-legend .swatch {
       width: 12px;
@@ -405,13 +408,13 @@
     }
     /* -- Mastery score card -- */
     .mastery-scorecard {
-      padding: var(--space-3) var(--space-3) var(--space-2);
+      padding: 0.75rem 0.75rem 0.5rem;
       border-bottom: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent);
       text-align: center;
     }
     .mastery-big-num {
       display: block;
-      font-size: 3rem;
+      font-size: 2.65rem;
       font-weight: 800;
       line-height: 1;
       color: var(--color-primary);
@@ -559,6 +562,11 @@
       .pg-table { grid-template-columns: 27px repeat(11, 20px); grid-auto-rows: 20px; gap: 2px; padding: 0.45rem; }
       .pg-cell { width: 20px; height: 20px; border-radius: 5px; font-size: 0.54rem; }
       .pg-top-label, .pg-row-label { font-size: 0.58rem; }
+      .pg-legend {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        justify-content: stretch;
+        gap: 0.45rem 0.65rem;
+      }
       .progress-graph svg { min-height: 130px; }
       body.mobile-play-mode.round-active .pg-panel { display: none; }
       body.mobile-play-mode.round-active .progress-graph-wrap { display: none; }
@@ -727,22 +735,96 @@
     /* ──── Speed target slider ──── */
     .speed-target-row {
       cursor: default;
+      --speed-target-thumb-size: 24px;
+      --speed-target-track-height: 7px;
+      --speed-target-fill: 25%;
     }
 
     .speed-target-row input[type="range"] {
       width: 100%;
-      min-height: 28px;
-      margin-top: 0.35rem;
+      height: var(--speed-target-thumb-size);
+      min-height: var(--speed-target-thumb-size);
+      margin: 0.35rem 0 0;
       padding: 0;
+      display: block;
+      background: transparent;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    .speed-target-row input[type="range"]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: var(--speed-target-track-height);
+      border-radius: var(--radius-full);
+      border: 1px solid color-mix(in srgb, var(--color-text) 24%, transparent);
+      background: linear-gradient(to right,
+        var(--color-primary) 0%,
+        var(--color-primary) var(--speed-target-fill),
+        color-mix(in srgb, var(--color-text) 12%, transparent) var(--speed-target-fill),
+        color-mix(in srgb, var(--color-text) 12%, transparent) 100%
+      );
+    }
+
+    .speed-target-row input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: var(--speed-target-thumb-size);
+      height: var(--speed-target-thumb-size);
+      margin-top: calc((var(--speed-target-track-height) - var(--speed-target-thumb-size)) / 2);
+      border-radius: 50%;
+      background: var(--color-text-muted);
+      border: 3px solid var(--color-surface-2);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.32);
+    }
+
+    .speed-target-row input[type="range"]::-moz-range-track {
+      width: 100%;
+      height: var(--speed-target-track-height);
+      border-radius: var(--radius-full);
+      border: 1px solid color-mix(in srgb, var(--color-text) 24%, transparent);
+      background: color-mix(in srgb, var(--color-text) 12%, transparent);
+    }
+
+    .speed-target-row input[type="range"]::-moz-range-progress {
+      height: var(--speed-target-track-height);
+      border-radius: var(--radius-full);
+      background: var(--color-primary);
+    }
+
+    .speed-target-row input[type="range"]::-moz-range-thumb {
+      width: calc(var(--speed-target-thumb-size) - 6px);
+      height: calc(var(--speed-target-thumb-size) - 6px);
+      border-radius: 50%;
+      background: var(--color-text-muted);
+      border: 3px solid var(--color-surface-2);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.32);
+    }
+
+    .speed-target-row input[type="range"]:focus-visible {
+      outline: none;
+    }
+
+    .speed-target-row input[type="range"]:focus-visible::-webkit-slider-thumb {
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 24%, transparent), 0 1px 4px rgba(0,0,0,0.32);
+    }
+
+    .speed-target-row input[type="range"]:focus-visible::-moz-range-thumb {
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 24%, transparent), 0 1px 4px rgba(0,0,0,0.32);
     }
 
     .speed-target-marks {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 0.12rem;
+      display: grid;
+      grid-template-columns: 1fr repeat(3, 2fr) 1fr;
+      width: calc(100% - var(--speed-target-thumb-size));
+      margin: 0.18rem calc(var(--speed-target-thumb-size) / 2) 0;
       font-size: 0.66rem;
       color: var(--color-text-muted);
       font-weight: 700;
+    }
+
+    .speed-target-marks span {
+      text-align: center;
+      line-height: 1.2;
     }
 
     .speed-target-note {
@@ -4511,8 +4593,10 @@
           '</div>';
       }
 
-      // SVG layout constants
-      var width = 320;
+      // SVG layout constants. Measure the chart container so wider desktop sidebars give the plot real extra room.
+      var graphBox = el.progressGraph.getBoundingClientRect ? el.progressGraph.getBoundingClientRect() : null;
+      var measuredWidth = graphBox && graphBox.width ? graphBox.width : el.progressGraph.clientWidth;
+      var width = Math.max(320, Math.min(480, Math.round(measuredWidth || 360)));
       var height = 260;
       var left = 34;
       var right = 10;
@@ -5128,6 +5212,23 @@
       setupSystemThemeListener();
     }
 
+    function updateSpeedTargetSliderFill() {
+      var min;
+      var max;
+      var value;
+      var percent;
+
+      if (!el.speedTargetSlider) return;
+
+      min = Number(el.speedTargetSlider.min) || 0;
+      max = Number(el.speedTargetSlider.max) || 0;
+      value = Number(el.speedTargetSlider.value) || 0;
+      percent = max === min ? 0 : ((value - min) / (max - min)) * 100;
+      percent = Math.max(0, Math.min(100, percent));
+
+      el.speedTargetSlider.style.setProperty('--speed-target-fill', percent + '%');
+    }
+
     function syncSpeedTargetSlider() {
       var target;
       var index;
@@ -5139,6 +5240,7 @@
 
       el.speedTargetSlider.value = String(index);
       el.speedTargetValue.textContent = String(target);
+      updateSpeedTargetSliderFill();
     }
 
     function setSpeedTargetFpm(target) {
@@ -5151,6 +5253,7 @@
       saveProgressToStorage(progress, { reason: 'speed-target-change' });
 
       if (el.speedTargetValue) el.speedTargetValue.textContent = String(validTarget);
+      updateSpeedTargetSliderFill();
 
       updateSpeedUi(round ? getLiveFpm() : 0);
       refreshProgressUi();
