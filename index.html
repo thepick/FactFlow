@@ -89,7 +89,7 @@
     .stat .value { margin-top: 0.1rem; font-size: 1.15rem; font-weight: 700; }
     .stat.time-warn   { background: var(--color-gold-highlight); transition: background 0.4s ease; }
     .stat.time-danger { background: var(--color-error-highlight); transition: background 0.4s ease; }
-    .practice-subtitle-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+    .practice-subtitle-row { display: flex; align-items: center; gap: 0; flex-wrap: wrap; }
     .daily-quizzes { font-size: var(--text-sm); color: var(--color-text-muted); font-weight: 700; white-space: nowrap; }
     .quiz-stat-divider { margin: 0 0.35rem; color: var(--color-text-faint); }
     .bar-block { margin-top: var(--space-3); }
@@ -641,7 +641,7 @@
       .stat { padding: 0.45rem 0.5rem; }
       .stat .label { font-size: 0.6rem; }
       .stat .value { font-size: 1rem; }
-      .practice-subtitle-row { gap: 0.4rem; }
+      .practice-subtitle-row { gap: 0; }
       .daily-quizzes, .bar-label-row { font-size: 0.76rem; }
       .bar-label-meta { font-size: 0.68rem; }
       .bar-block { margin-top: 0.65rem; }
@@ -1376,6 +1376,7 @@
                 <h2 id="practiceTitle">Practice</h2>
                 <div class="practice-subtitle-row">
                   <p class="subtle" id="practiceSubtitle">Ready</p>
+                  <span class="quiz-stat-divider" aria-hidden="true">|</span>
                   <span class="daily-quizzes">
                 Today: <span id="todaysQuizValue">0</span> of 5
                 <span class="quiz-stat-divider">|</span>
