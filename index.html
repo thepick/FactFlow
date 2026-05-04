@@ -1635,8 +1635,9 @@
     var timeoutTimer = null;
     var cooldownUntil = 0;
     var cooldownFactKey = null;  // Bug M1 fix: track which fact triggered the cooldown
+    var cooldownHideTimer = null; // Keeps any old auto-hide timer from hiding a newer banner
     var INPUT_COOLDOWN_MS = 0;   // Set > 0 to re-enable input lockout after wrong burst
-    var COOLDOWN_HINT_MS = 800;  // How long the 'Slow down!' banner flashes before auto-dismiss
+    var COOLDOWN_HINT_MS = 0;    // 0 = sticky: keep the banner visible until solved or timed out
     var wrongBurstCount = 0;
     var wrongBurstStart = 0;
 
@@ -4851,6 +4852,7 @@
 
     function triggerTimeout() {
       if (!round || !round.currentProblem) return;
+      hideCooldown(); // Replace the purple slow-down message with the yellow answer-reveal banner.
       round.timeoutsTriggered++;
       var ms = Date.now() - round.problemStartTime;
       round.progress = updateFactStats(
@@ -4997,10 +4999,13 @@
           } else {
             cooldownUntil = 0;
             cooldownFactKey = null;
-            setTimeout(function() {
-              el.cooldownBanner.classList.remove('active');
-              if (el.cooldownHint) el.cooldownHint.classList.remove('active');
-            }, COOLDOWN_HINT_MS);
+            if (cooldownHideTimer) { clearTimeout(cooldownHideTimer); cooldownHideTimer = null; }
+            if (COOLDOWN_HINT_MS > 0) {
+              cooldownHideTimer = setTimeout(function() {
+                cooldownHideTimer = null;
+                hideCooldown();
+              }, COOLDOWN_HINT_MS);
+            }
           }
         }
         buzz([35, 30, 35]);
@@ -5891,7 +5896,11 @@
 
     function hideFeedback() { el.answerInput.classList.remove('glow-good', 'glow-bad'); }
     function hideTimeoutOverlay() { el.timeoutOverlay.classList.remove('active'); el.timeoutInput.disabled = true; el.timeoutInput.value = ''; }
-    function hideCooldown() { el.cooldownBanner.classList.remove('active'); if (el.cooldownHint) { el.cooldownHint.classList.remove('active'); } }
+    function hideCooldown() {
+      if (cooldownHideTimer) { clearTimeout(cooldownHideTimer); cooldownHideTimer = null; }
+      if (el.cooldownBanner) el.cooldownBanner.classList.remove('active');
+      if (el.cooldownHint) { el.cooldownHint.classList.remove('active'); }
+    }
     function hideGraduateBanner() { el.graduateBanner.classList.remove('active'); }
     function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 
