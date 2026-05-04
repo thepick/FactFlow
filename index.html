@@ -1190,8 +1190,9 @@
           <h2>Your Progress</h2>
           <div class="pg-table" id="progressGrid"></div>
           <div class="pg-legend">
-            <span><span class="swatch fl"></span> Fluent</span>
-            <span><span class="swatch ln"></span> In progress</span>
+            <span><span class="swatch fl"></span> Mastered</span>
+            <span><span class="swatch ln"></span> Learning</span>
+            <span><span class="swatch st"></span> Needs Practice</span>
             <span><span class="swatch lk"></span> Locked</span>
           </div>
           <div class="progress-graph-wrap">
@@ -1235,7 +1236,7 @@
         <li>Yellow facts are still being learned.</li>
         <li>Red facts need extra review because of a recent wrong answer, timeout, or slow response.</li>
         <li>A green fact can move back down if it later shows weakness.</li>
-        <li>Fluent facts count fully, in-progress facts count partly, and accuracy and speed add a small bonus.</li>
+        <li>Mastered facts count fully, in-progress facts count partly, and accuracy and speed add a small bonus.</li>
       </ul>
       <p>The graph shows your most recent 10 quiz results by default. Use "Show all results" to see your saved Google progress.</p>
       <p>The chart zooms in to show progress clearly, but the mastery score is always out of 100.</p>
@@ -1293,7 +1294,7 @@
     // Overall mastery score weights. The score is mostly grid progress.
     // In-progress facts count as partial progress, while accuracy and speed add only a small progress-gated bonus.
     var MASTERY_TOTAL_FACTS = (MAX_TABLE - STARTING_TABLE + 1) * (MAX_TABLE - STARTING_TABLE + 1);
-    var MASTERY_IN_PROGRESS_WEIGHT = 0.5;
+    var MASTERY_IN_PROGRESS_WEIGHT = 0.65;
     var MASTERY_PROGRESS_WEIGHT = 0.85;
     var MASTERY_PERFORMANCE_BONUS_WEIGHT = 0.15;
     var MASTERY_SCORE_FORMULA_VERSION = 'grid-progress-v1';
@@ -3345,7 +3346,7 @@
         s.fastStreak = 0;
       }
 
-      if (!isCorrect || wasTimeout || responseMs > a.fluentMs * 1.5) {
+      if (isWeakAttempt({ isCorrect: isCorrect, responseMs: responseMs, timeout: !!wasTimeout }, a)) {
         s.slowOrWrongCount++;
       } else if (s.slowOrWrongCount > 0) {
         s.slowOrWrongCount--;
@@ -3387,11 +3388,53 @@
       return recent.slice(Math.max(0, recent.length - count));
     }
 
-    function isWeakAttempt(attempt, adaptive) {
-      if (!attempt) return false;
-      if (attempt.timeout) return true;
-      if (!attempt.isCorrect) return true;
+    function isWrongOrTimeoutAttempt(attempt) {
+      return !!attempt && (attempt.timeout || !attempt.isCorrect);
+    }
+
+    function isSlowCorrectAttempt(attempt, adaptive) {
+      if (!attempt || attempt.timeout || !attempt.isCorrect) return false;
       return Number(attempt.responseMs || 0) > adaptive.fluentMs * 1.5;
+    }
+
+    function isVerySlowCorrectAttempt(attempt, adaptive) {
+      if (!attempt || attempt.timeout || !attempt.isCorrect) return false;
+      return Number(attempt.responseMs || 0) > adaptive.fluentMs * 1.9;
+    }
+
+    function isWeakAttempt(attempt, adaptive) {
+      if (isWrongOrTimeoutAttempt(attempt)) return true;
+      return isVerySlowCorrectAttempt(attempt, adaptive);
+    }
+
+    function countRecentWeakAttempts(s, count, adaptive) {
+      var recent = getRecentAttempts(s, count);
+      var total = 0;
+      var i;
+      for (i = 0; i < recent.length; i += 1) {
+        if (isWeakAttempt(recent[i], adaptive)) total += 1;
+      }
+      return total;
+    }
+
+    function countRecentWrongOrTimeout(s, count) {
+      var recent = getRecentAttempts(s, count);
+      var total = 0;
+      var i;
+      for (i = 0; i < recent.length; i += 1) {
+        if (isWrongOrTimeoutAttempt(recent[i])) total += 1;
+      }
+      return total;
+    }
+
+    function countRecentSlowCorrect(s, count, adaptive) {
+      var recent = getRecentAttempts(s, count);
+      var total = 0;
+      var i;
+      for (i = 0; i < recent.length; i += 1) {
+        if (isSlowCorrectAttempt(recent[i], adaptive)) total += 1;
+      }
+      return total;
     }
 
     function wasRecentEvent(timestamp, adaptive) {
@@ -3410,12 +3453,7 @@
     }
 
     function hasRecentTimeoutOrWrong(s, count) {
-      var recent = getRecentAttempts(s, count);
-      var i;
-      for (i = 0; i < recent.length; i += 1) {
-        if (recent[i].timeout || !recent[i].isCorrect) return true;
-      }
-      return false;
+      return countRecentWrongOrTimeout(s, count) > 0;
     }
 
     function hasSpacedSuccesses(attempts, adaptive) {
@@ -3432,8 +3470,7 @@
 
     function isFactStruggling(s, adaptive) {
       var recent = getRecentAttempts(s, 4);
-      var weakCount = 0;
-      var i;
+      var weakCount = countRecentWeakAttempts(s, 4, adaptive);
 
       if (s.shown <= 0) return false;
 
@@ -3441,15 +3478,11 @@
         return true;
       }
 
-      for (i = 0; i < recent.length; i += 1) {
-        if (isWeakAttempt(recent[i], adaptive)) weakCount += 1;
-      }
-
       if (recent.length >= 2 && weakCount >= 2) return true;
 
       if (recent.length >= 1) {
         var last = recent[recent.length - 1];
-        if (last.timeout || !last.isCorrect) return true;
+        if (last.timeout) return true;
       }
 
       return false;
@@ -3460,16 +3493,15 @@
       var last3 = getRecentAttempts(s, 3);
       var fastCorrectCount = 0;
       var correctCount = 0;
-      var weakCount = 0;
+      var weakCount = countRecentWeakAttempts(s, 6, adaptive);
+      var wrongOrTimeoutCount = countRecentWrongOrTimeout(s, 6);
+      var slowCorrectCount = countRecentSlowCorrect(s, 6, adaptive);
+      var wasAlreadyFluent = s.lastStatus === 'fluent';
       var i;
 
       if (s.shown < 4) return false;
-      if (s.confidence < 85) return false;
-
-      for (i = 0; i < recent.length; i += 1) {
-        if (isWeakAttempt(recent[i], adaptive)) weakCount += 1;
-      }
-      if (weakCount > 0) return false;
+      if (s.confidence < 85 && !(wasAlreadyFluent && s.confidence >= 80)) return false;
+      if (wrongOrTimeoutCount > 0) return false;
 
       for (i = 0; i < last3.length; i += 1) {
         if (last3[i].isCorrect && !last3[i].timeout) {
@@ -3482,8 +3514,14 @@
 
       if (last3.length < 3) return false;
       if (correctCount < 3) return false;
-      if (fastCorrectCount < 2) return false;
       if (!hasSpacedSuccesses(last3, adaptive)) return false;
+
+      if (wasAlreadyFluent) {
+        if (weakCount <= 1 && slowCorrectCount <= 1 && fastCorrectCount >= 1) return true;
+      }
+
+      if (weakCount > 0) return false;
+      if (fastCorrectCount < 2) return false;
 
       return true;
     }
@@ -3515,6 +3553,8 @@
         delta = 8;
       } else if (speedRatio <= 1.5) {
         delta = 3;
+      } else if (speedRatio <= 1.8) {
+        delta = 1;
       } else {
         delta = 0;
       }
@@ -3533,12 +3573,10 @@
 
       current = current + delta;
 
-      if (hasRecentWeakness(s, adaptive)) {
-        current = Math.min(current, 84);
-      }
-
       if (hasRecentTimeoutOrWrong(s, 4)) {
-        current = Math.min(current, 74);
+        current = Math.min(current, 80);
+      } else if (hasRecentWeakness(s, adaptive)) {
+        current = Math.min(current, 92);
       }
 
       return clamp(Math.round(current), 0, 100);
@@ -3546,7 +3584,6 @@
 
     // ═══════════════════════════ CONFETTI ═══════════════════════════
     function launchConfettiOnce(colors) {
-      var endTime;
       var confettiColors;
 
       if (hasLaunchedConfetti) {
@@ -3558,7 +3595,6 @@
       }
 
       hasLaunchedConfetti = true;
-      endTime = Date.now() + 5000;
 
       confettiColors = colors || [
         '#26ccff',
@@ -3575,25 +3611,17 @@
         confettiTimer = null;
       }
 
-      confettiTimer = setInterval(function () {
-        if (Date.now() > endTime) {
-          clearInterval(confettiTimer);
-          confettiTimer = null;
-          return;
-        }
-
-        confetti({
-          particleCount: 100,
-          startVelocity: 30,
-          spread: 360,
-          ticks: 60,
-          origin: {
-            x: Math.random(),
-            y: Math.random() - 0.2
-          },
-          colors: confettiColors
-        });
-      }, 200);
+      confetti({
+        particleCount: 70,
+        startVelocity: 28,
+        spread: 260,
+        ticks: 55,
+        origin: {
+          x: 0.5,
+          y: 0.2
+        },
+        colors: confettiColors
+      });
     }
 
     function stopConfetti() {
@@ -3644,7 +3672,7 @@
           var recent = s.recent.slice(-4);
           var recentAcc = recent.length ? recent.filter(function (r) { return r.isCorrect && !r.timeout; }).length / recent.length : 0;
           var recentAvg = recent.length ? recent.reduce(function (sum, r) { return sum + r.responseMs; }, 0) / recent.length : s.avgMs || 0;
-          return s.shown >= 4 && s.mastery >= 0.78 && recent.length >= 3 && recentAcc >= 0.75 && recentAvg > 0 && recentAvg <= state.settings.adaptive.fluentMs * 1.2;
+          return s.shown >= 4 && s.mastery >= 0.78 && recent.length >= 3 && recentAcc >= 0.75 && recentAvg > 0 && recentAvg <= state.settings.adaptive.fluentMs * 1.5;
         });
         if (ready && candidate < 12) maxSecond = candidate + 1;
       }
