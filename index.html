@@ -103,11 +103,8 @@
     .problem-text { font-size: clamp(2.4rem, 6vw, 4.5rem); font-weight: 700; letter-spacing: -0.03em; }
     .answer-wrap { max-width: 260px; margin: 0 auto; position: relative; }
     .cooldown-stack {
-      position: absolute;
-      top: 0.75rem;
-      left: 50%;
-      width: min(380px, calc(100% - 1.5rem));
-      transform: translateX(-50%);
+      width: min(92%, 680px);
+      margin: 0 auto;
       display: grid;
       gap: 0.35rem;
       pointer-events: none;
@@ -173,6 +170,8 @@
     .cooldown-hint.active { display: block; }
     .cooldown-banner { display: none; text-align: center; padding: var(--space-2) var(--space-3); background: var(--color-error-highlight); color: var(--color-error); border-radius: var(--radius-lg); font-weight: 700; font-size: var(--text-sm); margin-top: var(--space-2); }
     .cooldown-banner.active { display: block; }
+    .cooldown-stack .cooldown-banner { margin-top: 0; }
+    .cooldown-stack .cooldown-banner.active { margin-bottom: var(--space-2); }
     .completion-celebration {
       display: none;
       max-width: 380px;
