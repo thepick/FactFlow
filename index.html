@@ -1455,7 +1455,6 @@
           <div class="panel play-panel" id="playPanel">
             <div class="cooldown-stack" aria-live="polite">
               <div class="cooldown-banner" id="cooldownBanner"></div>
-              <div class="cooldown-hint" id="cooldownHint"></div>
             </div>
             <div class="round-countdown-overlay" id="roundCountdownOverlay" aria-live="assertive" aria-hidden="true">
               <div class="round-countdown-card">
@@ -5025,12 +5024,8 @@
         if (wrongBurstCount >= 2) {
           cooldownUntil = nw + 3000;
           cooldownFactKey = round.currentProblem ? currentFactKey : null;  // Bug M1 fix
-          el.cooldownBanner.textContent = 'Slow down! Read carefully.';
+          el.cooldownBanner.textContent = 'Slow Down! Read carefully';
           el.cooldownBanner.classList.add('active');
-          if (el.cooldownHint && round && round.currentProblem) {
-            el.cooldownHint.textContent = 'Think carefully: ' + round.currentProblem.left + ' × ' + round.currentProblem.right + ' = ?';
-            el.cooldownHint.classList.add('active');
-          }
           // PATCH v7: input stays live - banner flashes briefly, no blocking delay
           wrongBurstCount = 0; wrongBurstStart = 0;
           if (INPUT_COOLDOWN_MS > 0) {
@@ -5293,6 +5288,23 @@
 
       if (el.completionVideo) {
         try {
+          el.completionVideo.loop = true;
+          el.completionVideo.setAttribute('loop', '');
+          el.completionVideo.muted = true;
+          if (!el.completionVideo._factflowLoopPatch) {
+            el.completionVideo._factflowLoopPatch = true;
+            el.completionVideo.addEventListener('ended', function () {
+              try {
+                if (el.completionCelebration && el.completionCelebration.classList.contains('active')) {
+                  el.completionVideo.currentTime = 0;
+                  var replayPromise = el.completionVideo.play();
+                  if (replayPromise && typeof replayPromise.catch === 'function') {
+                    replayPromise.catch(function (e) {});
+                  }
+                }
+              } catch (e) {}
+            });
+          }
           el.completionVideo.currentTime = 0;
           var playPromise = el.completionVideo.play();
           if (playPromise && typeof playPromise.catch === 'function') {
