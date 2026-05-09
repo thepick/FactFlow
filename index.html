@@ -4258,6 +4258,7 @@
     function getPlayAreaConfettiOrigins() {
       var playRect;
       var problemRect;
+      var problemUsable;
       var sourceInset;
       var yPx;
 
@@ -4269,9 +4270,24 @@
       }
 
       playRect = el.playPanel.getBoundingClientRect();
-      problemRect = (el.problemArea && el.problemArea.getBoundingClientRect) ? el.problemArea.getBoundingClientRect() : playRect;
+
+      problemRect = (el.problemArea && el.problemArea.getBoundingClientRect)
+        ? el.problemArea.getBoundingClientRect()
+        : null;
+
+      problemUsable = problemRect &&
+        problemRect.width > 0 &&
+        problemRect.height > 0 &&
+        problemRect.bottom > 0;
+
       sourceInset = Math.min(Math.max(playRect.width * 0.16, 42), 120);
-      yPx = problemRect.top + (problemRect.height * 0.68);
+
+      if (problemUsable) {
+        yPx = problemRect.top + (problemRect.height * 0.68);
+      } else {
+        // Fall back to play panel center when problem area is hidden (e.g. complete-mode)
+        yPx = playRect.top + (playRect.height * 0.42);
+      }
 
       return {
         left: {
@@ -4295,6 +4311,7 @@
       }
 
       if (typeof confetti === 'undefined') {
+        console.warn('Confetti library was not loaded.');
         return;
       }
 
@@ -5281,6 +5298,16 @@
     function showCompletionCelebration(progress, options) {
       options = options || {};
       if (!el.playPanel || !el.completionCelebration) return;
+
+      // Fire confetti BEFORE adding complete-mode, because the CSS
+      // display:none on .problem-area would zero out getBoundingClientRect()
+      // and cause confetti to shoot from the top of the viewport (off-screen).
+      if (options.celebrate) {
+        finalCelebrationShown = true;
+        resetConfetti();
+        launchConfettiOnce();
+      }
+
       el.playPanel.classList.add('complete-mode');
       el.completionCelebration.classList.add('active');
       el.completionCelebration.setAttribute('aria-hidden', 'false');
@@ -5314,12 +5341,6 @@
 
       if (el.startBtn && !round && !roundStartCountdownActive && !startBtnCooldown) {
         el.startBtn.textContent = 'Review All Facts';
-      }
-
-      if (options.celebrate) {
-        finalCelebrationShown = true;
-        resetConfetti();
-        launchConfettiOnce();
       }
     }
 
