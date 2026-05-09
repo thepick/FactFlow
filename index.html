@@ -2393,6 +2393,9 @@
       var p;
       if (SHARED_DEVICE_MODE && !isGooglePracticeSession()) {
         p = getBlankWorkingProgress();
+        finalCelebrationShown = false;
+        resetConfetti();
+        hideCompletionCelebration();
         renderProgressGrid(p);
         renderProgressGraph(p);
         updatePracticeHeader(p);
@@ -5369,11 +5372,20 @@
       options = options || {};
       progress = progress || (round && round.progress) || loadProgress();
       var completed = hasCompletedAllFacts(progress, options.score);
+      var shouldCelebrate;
 
       console.log('[confetti] syncCompletionUi: completed=' + completed + ' round=' + !!round + ' optionCelebrate=' + options.celebrate + ' scoreArg=' + options.score);
       if (completed && !round) {
-        showCompletionCelebration(progress, { celebrate: !!options.celebrate });
+        shouldCelebrate = options.celebrate;
+        if (typeof shouldCelebrate === 'undefined') {
+          shouldCelebrate = !finalCelebrationShown;
+        } else {
+          shouldCelebrate = !!shouldCelebrate;
+        }
+        showCompletionCelebration(progress, { celebrate: shouldCelebrate });
       } else if (!completed) {
+        finalCelebrationShown = false;
+        resetConfetti();
         hideCompletionCelebration();
       }
 
