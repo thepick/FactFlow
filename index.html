@@ -4307,6 +4307,7 @@
       var endAt;
 
       if (hasLaunchedConfetti) {
+        console.log('[confetti] launchConfettiOnce skipped — already launched');
         return;
       }
 
@@ -4315,6 +4316,7 @@
         return;
       }
 
+      console.log('[confetti] launchConfettiOnce firing! hasLaunchedConfetti=' + hasLaunchedConfetti);
       hasLaunchedConfetti = true;
 
       confettiColors = colors || [
@@ -4841,7 +4843,9 @@
       round = null;
       if (el.newFactLabel) { el.newFactLabel.textContent = ''; el.newFactLabel.classList.remove('visible'); }
       el.problemText.textContent = save ? "Time’s up!" : 'Ready?';
-      if (!syncCompletionUi(finalProgress, { celebrate: !finalCelebrationShown })) {
+      var syncResult = syncCompletionUi(finalProgress, { celebrate: !finalCelebrationShown });
+      console.log('[confetti] stopRound syncCompletionUi result: completed=' + syncResult + ' celebrate=' + !finalCelebrationShown + ' finalCelebrationShown=' + finalCelebrationShown);
+      if (!syncResult) {
         setStatus(el.roundStatus, 'Round finished. Start another!', '');
       }
       renderProgressGrid(finalProgress);
@@ -5303,9 +5307,12 @@
       // display:none on .problem-area would zero out getBoundingClientRect()
       // and cause confetti to shoot from the top of the viewport (off-screen).
       if (options.celebrate) {
+        console.log('[confetti] launching from showCompletionCelebration');
         finalCelebrationShown = true;
         resetConfetti();
         launchConfettiOnce();
+      } else {
+        console.log('[confetti] showCompletionCelebration called but celebrate=false (finalCelebrationShown=' + finalCelebrationShown + ')');
       }
 
       el.playPanel.classList.add('complete-mode');
@@ -5363,6 +5370,7 @@
       progress = progress || (round && round.progress) || loadProgress();
       var completed = hasCompletedAllFacts(progress, options.score);
 
+      console.log('[confetti] syncCompletionUi: completed=' + completed + ' round=' + !!round + ' optionCelebrate=' + options.celebrate + ' scoreArg=' + options.score);
       if (completed && !round) {
         showCompletionCelebration(progress, { celebrate: !!options.celebrate });
       } else if (!completed) {
