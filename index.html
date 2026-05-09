@@ -4305,15 +4305,14 @@
       var confettiColors;
       var duration;
       var endAt;
-      var confettiFn;
 
       if (hasLaunchedConfetti) {
-        return true;
+        return;
       }
 
-      confettiFn = (typeof window !== 'undefined' && typeof window.confetti === 'function') ? window.confetti : null;
-      if (!confettiFn) {
-        return false;
+      if (typeof confetti === 'undefined') {
+        console.warn('Confetti library was not loaded.');
+        return;
       }
 
       hasLaunchedConfetti = true;
@@ -4339,26 +4338,24 @@
       function fireSideConfetti() {
         var origins = getPlayAreaConfettiOrigins();
 
-        confettiFn({
+        confetti({
           particleCount: 36,
           angle: 55,
           spread: 68,
           startVelocity: 42,
           ticks: 95,
           origin: origins.left,
-          colors: confettiColors,
-          zIndex: 2000
+          colors: confettiColors
         });
 
-        confettiFn({
+        confetti({
           particleCount: 36,
           angle: 125,
           spread: 68,
           startVelocity: 42,
           ticks: 95,
           origin: origins.right,
-          colors: confettiColors,
-          zIndex: 2000
+          colors: confettiColors
         });
       }
 
@@ -4371,8 +4368,6 @@
         }
         fireSideConfetti();
       }, 260);
-
-      return true;
     }
 
     function stopConfetti() {
@@ -4381,36 +4376,13 @@
         confettiTimer = null;
       }
 
-      if (typeof window !== 'undefined' && window.confetti && window.confetti.reset) {
-        window.confetti.reset();
+      if (typeof confetti !== 'undefined' && confetti.reset) {
+        confetti.reset();
       }
     }
 
     function resetConfetti() {
       hasLaunchedConfetti = false;
-    }
-
-    function launchCompletionConfettiWhenReady() {
-      var attempts = 0;
-      var maxAttempts = 20;
-
-      resetConfetti();
-
-      function tryLaunch() {
-        if (launchConfettiOnce()) {
-          finalCelebrationShown = true;
-          return;
-        }
-
-        attempts += 1;
-        if (attempts < maxAttempts) {
-          setTimeout(tryLaunch, 100);
-        } else if (typeof console !== 'undefined' && console.warn) {
-          console.warn('Confetti library was not loaded, so the completion confetti could not launch.');
-        }
-      }
-
-      tryLaunch();
     }
 
     // ═══════════════════════════ GRADUATION ═══════════════════════════
@@ -5327,8 +5299,13 @@
       options = options || {};
       if (!el.playPanel || !el.completionCelebration) return;
 
-      if (options.celebrate && !finalCelebrationShown) {
-        launchCompletionConfettiWhenReady();
+      // Fire confetti BEFORE adding complete-mode, because the CSS
+      // display:none on .problem-area would zero out getBoundingClientRect()
+      // and cause confetti to shoot from the top of the viewport (off-screen).
+      if (options.celebrate) {
+        finalCelebrationShown = true;
+        resetConfetti();
+        launchConfettiOnce();
       }
 
       el.playPanel.classList.add('complete-mode');
