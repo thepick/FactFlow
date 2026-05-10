@@ -827,7 +827,7 @@
       cursor: default;
       --speed-target-thumb-size: 24px;
       --speed-target-track-height: 7px;
-      --speed-target-fill: 25%;
+      --speed-target-fill: 0%;
     }
 
     .speed-target-row input[type="range"] {
@@ -1283,7 +1283,7 @@
               <span class="settings-text">
                 <span class="settings-title">Speed Target</span>
                 <span class="settings-subtitle">
-                  <span id="speedTargetValue">30</span> facts/min
+                  <span id="speedTargetValue">20</span> facts/min
                 </span>
                 <input
                   type="range"
@@ -1291,7 +1291,7 @@
                   min="0"
                   max="4"
                   step="1"
-                  value="1"
+                  value="0"
                   aria-label="Speed target in facts per minute"
                 />
                 <span class="speed-target-marks" aria-hidden="true">
@@ -1573,7 +1573,7 @@
     // User-adjustable speed target.
     // Saved on the synced progress object so each Google user can have a different target.
     var SPEED_TARGET_OPTIONS = [20, 30, 40, 50, 60];
-    var DEFAULT_SPEED_TARGET_FPM = 30;
+    var DEFAULT_SPEED_TARGET_FPM = 20;
     var DAILY_QUIZ_TARGET = 5;
 
     // Mastery is now more forgiving for classroom typing practice.
@@ -1602,10 +1602,6 @@
     // Mastery graph display. Default view shows the most recent completed quizzes.
     // Change this number if you want the graph to show more or fewer recent quiz results by default.
     var GRAPH_DEFAULT_VISIBLE_RESULTS = 10;
-
-    // Debug build: leave this on while auditing why the graph is not accumulating points.
-    // Set to false after the issue is identified.
-    var GRAPH_DEBUG = true;
 
     // Mobile haptic feedback. Default is on. Students can turn it off in Settings.
     // Works when the browser exposes navigator.vibrate and the device allows vibration.
@@ -1652,12 +1648,6 @@
     var postQuestionWorkTimer = null;
 
     var PERF_DEBUG = false;
-    var graphDebugState = {
-      lastRenderSignature: '',
-      lastWorkingSaveSignature: '',
-      lastStorageWriteSignature: '',
-      lastMemorySignature: ''
-    };
     var perfCounters = {
       loadProgress: 0,
       saveProgress: 0,
@@ -1699,6 +1689,7 @@
       lastSyncedLocalHash: '',
       lastPollAt: 0,
       needsSyncAfterCurrent: false,
+      deferSyncUntilRoundEnds: false,
       permissionRetryAttempted: false,
       tokenRefreshInFlight: false
     };
@@ -1866,97 +1857,6 @@
       return Date.now();
     }
 
-    function getGraphDebugHistory(progress) {
-      if (!progress || !Array.isArray(progress.sessionHistory)) return [];
-      return progress.sessionHistory;
-    }
-
-    function getGraphDebugSessionSummary(session, index) {
-      if (!session) return null;
-      return {
-        index: index,
-        session: session.session,
-        sessionId: session.sessionId,
-        score: session.masteryScore != null ? session.masteryScore : session.score,
-        fpm: session.fpm,
-        accuracy: session.accuracy,
-        completedAt: session.completedAt,
-        date: session.date,
-        at: session.at
-      };
-    }
-
-    function getGraphDebugHistoryTail(progress, limit) {
-      var history = getGraphDebugHistory(progress);
-      var out = [];
-      var start = Math.max(0, history.length - (limit || 6));
-      var i;
-      for (i = start; i < history.length; i += 1) {
-        out.push(getGraphDebugSessionSummary(history[i], i));
-      }
-      return out;
-    }
-
-    function getGraphDebugSignature(progress) {
-      var history = getGraphDebugHistory(progress);
-      var last = history.length ? history[history.length - 1] : null;
-      return [
-        'sessionsCompleted=' + (progress && progress.sessionsCompleted != null ? progress.sessionsCompleted : ''),
-        'history=' + history.length,
-        'lastId=' + (last && last.sessionId ? last.sessionId : ''),
-        'lastSession=' + (last && last.session != null ? last.session : ''),
-        'lastScore=' + (last && last.masteryScore != null ? last.masteryScore : '')
-      ].join('|');
-    }
-
-    function getGraphDebugProgressSummary(progress) {
-      var history = getGraphDebugHistory(progress);
-      return {
-        sessionsCompleted: progress && progress.sessionsCompleted,
-        historyLength: history.length,
-        currentTable: progress && progress.currentTable,
-        historyTail: getGraphDebugHistoryTail(progress, 6)
-      };
-    }
-
-    function graphDebugLog(eventName, details) {
-      if (!GRAPH_DEBUG) return;
-      try {
-        if (window.console && console.log) {
-          console.log('[FactFlow Graph Debug] ' + eventName, details || {});
-        }
-      } catch (e) {}
-    }
-
-    function graphDebugWarn(eventName, details) {
-      if (!GRAPH_DEBUG) return;
-      try {
-        if (window.console && console.warn) {
-          console.warn('[FactFlow Graph Debug] ' + eventName, details || {});
-        } else {
-          graphDebugLog(eventName, details);
-        }
-      } catch (e) {}
-    }
-
-    function graphDebugSnapshot(label) {
-      var progress = null;
-      var summary;
-      try {
-        progress = (round && round.progress) || loadProgress({ force: true });
-        summary = getGraphDebugProgressSummary(progress);
-        graphDebugLog('manual snapshot' + (label ? ' - ' + label : ''), summary);
-        return summary;
-      } catch (e) {
-        graphDebugWarn('manual snapshot failed', { message: e && e.message, name: e && e.name });
-        return null;
-      }
-    }
-
-    try {
-      window.factflowGraphDebugSnapshot = graphDebugSnapshot;
-    } catch (e) {}
-
     function getValidSpeedTargetFpm(value) {
       value = Number(value);
       return SPEED_TARGET_OPTIONS.indexOf(value) > -1 ? value : DEFAULT_SPEED_TARGET_FPM;
@@ -2086,32 +1986,14 @@
     }
 
     function saveWorkingProgress(progress) {
-      var payload;
-      var signature;
-
       if (SHARED_DEVICE_MODE && !isGooglePracticeSession()) {
-        graphDebugLog('saveWorkingProgress skipped - not a Google practice session', getGraphDebugProgressSummary(progress));
         return false;
       }
 
       try {
-        payload = JSON.stringify(progress || getBlankWorkingProgress());
-        sessionStorage.setItem(SIGNED_IN_WORKING_PROGRESS_KEY, payload);
-        signature = getGraphDebugSignature(progress || getBlankWorkingProgress());
-        if (signature !== graphDebugState.lastWorkingSaveSignature) {
-          graphDebugState.lastWorkingSaveSignature = signature;
-          graphDebugLog('saveWorkingProgress success', {
-            payloadBytes: payload ? payload.length : 0,
-            summary: getGraphDebugProgressSummary(progress || getBlankWorkingProgress())
-          });
-        }
+        sessionStorage.setItem(SIGNED_IN_WORKING_PROGRESS_KEY, JSON.stringify(progress || getBlankWorkingProgress()));
         return true;
       } catch (e) {
-        graphDebugWarn('saveWorkingProgress failed', {
-          message: e && e.message,
-          name: e && e.name,
-          summary: getGraphDebugProgressSummary(progress || getBlankWorkingProgress())
-        });
         return false;
       }
     }
@@ -2255,18 +2137,7 @@
       }
 
       if (SHARED_DEVICE_MODE) {
-        var workingSaved = saveWorkingProgress(progress);
-        var storageSignature = (opts.reason || 'progress-change') + '|' + getGraphDebugSignature(progress);
-        if (storageSignature !== graphDebugState.lastStorageWriteSignature) {
-          graphDebugState.lastStorageWriteSignature = storageSignature;
-          graphDebugLog('writeProgressToStorageNow shared', {
-            reason: opts.reason || 'progress-change',
-            workingSaved: workingSaved,
-            localSaveCounterBefore: syncState.localSaveCounter,
-            pendingPushBefore: syncState.pendingPush,
-            summary: getGraphDebugProgressSummary(progress)
-          });
-        }
+        saveWorkingProgress(progress);
         syncState.localSaveCounter += 1;
         syncState.pendingPush = true;
         scheduleCloudSync(opts.reason || 'progress-change');
@@ -2315,16 +2186,6 @@
       progressStore.current = migrateProgress(progress || defaultProgress());
       progressStore.dirty = true;
       progressStore.lastReason = reason || 'progress-change';
-      var memorySignature = progressStore.lastReason + '|' + getGraphDebugSignature(progressStore.current);
-      if (memorySignature !== graphDebugState.lastMemorySignature) {
-        graphDebugState.lastMemorySignature = memorySignature;
-        graphDebugLog('setProgressInMemory', {
-          reason: progressStore.lastReason,
-          dirty: progressStore.dirty,
-          roundAttachedToSameObject: !!(round && round.progress === progressStore.current),
-          summary: getGraphDebugProgressSummary(progressStore.current)
-        });
-      }
       return progressStore.current;
     }
 
@@ -2380,13 +2241,6 @@
     function saveProgressToStorage(progress, opts) {
       opts = opts || {};
 
-      graphDebugLog('saveProgressToStorage called', {
-        reason: opts.reason || 'progress-change',
-        flushNow: !!opts.flushNow,
-        skipSync: !!opts.skipSync,
-        summary: getGraphDebugProgressSummary(progress)
-      });
-
       setProgressInMemory(progress, opts.reason || 'progress-change');
 
       if (opts.flushNow) {
@@ -2397,11 +2251,13 @@
     }
 
     function saveProgressLocalOnly(progress, reason) {
-      graphDebugLog('saveProgressLocalOnly called', {
-        reason: reason || 'local-only',
-        roundActive: !!round,
-        summary: getGraphDebugProgressSummary(progress)
-      });
+      if (round && reason === 'cloud-merge') {
+        syncState.pendingPush = true;
+        syncState.deferSyncUntilRoundEnds = true;
+        setSyncStatus('syncing', 'Sync after round');
+        return;
+      }
+
       if (SHARED_DEVICE_MODE) {
         saveWorkingProgress(progress);
         markProgressMemoryClean(progress, reason || 'local-only');
@@ -3622,14 +3478,14 @@
       merged.factStats = mergeFactStats(local.factStats || {}, cloud.factStats || {});
       merged.sessionHistory = mergeSessionHistory(local.sessionHistory || [], cloud.sessionHistory || []);
 
-      graphDebugLog('mergeProgress session histories', {
-        local: getGraphDebugProgressSummary(local),
-        cloud: getGraphDebugProgressSummary(cloud),
-        mergedHistoryLength: merged.sessionHistory.length,
-        mergedHistoryTail: getGraphDebugHistoryTail({ sessionHistory: merged.sessionHistory }, 6)
-      });
-
-      merged.sessionsCompleted = merged.sessionHistory.length;
+      // Keep the displayed quiz/session count from moving backward after history merges.
+      // The graph uses sessionHistory, but sessionsCompleted may already be higher if old
+      // entries were trimmed or came from an older save shape.
+      merged.sessionsCompleted = Math.max(
+        Number(local.sessionsCompleted) || 0,
+        Number(cloud.sessionsCompleted) || 0,
+        merged.sessionHistory.length
+      );
 
       merged.allTimeBestStreak = Math.max(Number(local.allTimeBestStreak) || 0, Number(cloud.allTimeBestStreak) || 0);
       merged.allTimeBestFpm = Math.max(Number(local.allTimeBestFpm) || 0, Number(cloud.allTimeBestFpm) || 0);
@@ -3740,40 +3596,84 @@
       return list;
     }
 
-    function ensureSessionId(session) {
-      if (session.sessionId) return session.sessionId;
-      var stamp = session.completedAt || session.date || session.at || session.day || nowIso();
-      var score = typeof session.score !== 'undefined' ? session.score : '';
-      var fpm = typeof session.fpm !== 'undefined' ? session.fpm : '';
-      return 'legacy-' + stamp + '-' + score + '-' + fpm;
+    function getSessionTimeMs(session) {
+      var raw = session && (session.completedAt || session.date || session.at || session.day);
+      var d;
+      if (!raw) return 0;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(String(raw))) {
+        raw = String(raw) + 'T00:00:00';
+      }
+      d = new Date(raw);
+      if (isNaN(d.getTime())) return 0;
+      return d.getTime();
+    }
+
+    function getSessionDateValue(session) {
+      if (!session) return null;
+      return session.completedAt || session.date || session.at || session.day || null;
+    }
+
+    function ensureSessionId(session, historyIndex) {
+      var stamp;
+      var score;
+      var accuracy;
+      var fpm;
+      var table;
+      var ordinal;
+      var indexPart;
+
+      if (session && session.sessionId) return session.sessionId;
+
+      session = session || {};
+      stamp = getSessionDateValue(session) || 'no-time';
+      score = typeof session.masteryScore !== 'undefined' ? session.masteryScore : (typeof session.score !== 'undefined' ? session.score : '');
+      accuracy = typeof session.accuracy !== 'undefined' ? session.accuracy : '';
+      fpm = typeof session.fpm !== 'undefined' ? session.fpm : '';
+      table = typeof session.currentTable !== 'undefined' ? session.currentTable : '';
+      ordinal = typeof session.session !== 'undefined' ? session.session : '';
+      indexPart = typeof historyIndex === 'number' ? historyIndex : 'x';
+
+      // Include the original array index so older same-day / same-score entries do not
+      // collapse into one graph point during cloud/local history merges. Current entries
+      // have real sessionIds, so this only affects legacy or partial records.
+      return 'legacy-' + indexPart + '-' + stamp + '-' + score + '-' + accuracy + '-' + fpm + '-' + table + '-' + ordinal;
     }
 
     function mergeSessionHistory(aHistory, bHistory) {
       var map = {};
       var list = [];
-      var duplicateCount = 0;
+      var mergeOrder = 0;
 
-      function addSession(s) {
+      function addSession(s, historyIndex) {
+        var existing;
         if (!s) return;
         var copy = cloneJson(s);
-        copy.sessionId = ensureSessionId(copy);
-        if (!map[copy.sessionId]) {
+        copy.sessionId = ensureSessionId(copy, historyIndex);
+        copy._mergeOrder = mergeOrder;
+        mergeOrder += 1;
+        if (!copy.completedAt && (copy.date || copy.at)) {
+          copy.completedAt = copy.date || copy.at;
+        }
+        if (!copy.date && (copy.completedAt || copy.at)) {
+          copy.date = copy.completedAt || copy.at;
+        }
+        if (!copy.at && (copy.completedAt || copy.date)) {
+          copy.at = copy.completedAt || copy.date;
+        }
+
+        existing = map[copy.sessionId];
+        if (!existing) {
           map[copy.sessionId] = copy;
           list.push(copy);
         } else {
-          duplicateCount += 1;
-          graphDebugWarn('mergeSessionHistory duplicate sessionId', {
-            sessionId: copy.sessionId,
-            existing: getGraphDebugSessionSummary(map[copy.sessionId], -1),
-            incoming: getGraphDebugSessionSummary(copy, -1)
-          });
-          map[copy.sessionId] = mergeOneSession(map[copy.sessionId], copy);
+          map[copy.sessionId] = mergeOneSession(existing, copy);
+          map[copy.sessionId]._mergeOrder = Math.min(existing._mergeOrder || 0, copy._mergeOrder || 0);
         }
       }
 
       var i;
-      for (i = 0; i < aHistory.length; i += 1) addSession(aHistory[i]);
-      for (i = 0; i < bHistory.length; i += 1) addSession(bHistory[i]);
+      for (i = 0; i < aHistory.length; i += 1) addSession(aHistory[i], i);
+      for (i = 0; i < bHistory.length; i += 1) addSession(bHistory[i], i);
 
       list = [];
       for (var id in map) {
@@ -3781,30 +3681,27 @@
       }
 
       list.sort(function (x, y) {
-        var xt = new Date(x.completedAt || x.date || x.at || 0).getTime() || 0;
-        var yt = new Date(y.completedAt || y.date || y.at || 0).getTime() || 0;
-        return xt - yt;
+        var xt = getSessionTimeMs(x);
+        var yt = getSessionTimeMs(y);
+        if (xt !== yt) return xt - yt;
+        return (Number(x._mergeOrder) || 0) - (Number(y._mergeOrder) || 0);
       });
 
       for (i = 0; i < list.length; i += 1) {
         list[i].session = i + 1;
+        delete list[i]._mergeOrder;
       }
-
-      graphDebugLog('mergeSessionHistory result', {
-        localInputLength: aHistory.length,
-        cloudInputLength: bHistory.length,
-        duplicateCount: duplicateCount,
-        outputLength: list.length,
-        outputTail: getGraphDebugHistoryTail({ sessionHistory: list }, 6)
-      });
 
       return list;
     }
 
     function mergeOneSession(a, b) {
-      var at = new Date(a.completedAt || a.date || a.at || 0).getTime() || 0;
-      var bt = new Date(b.completedAt || b.date || b.at || 0).getTime() || 0;
-      return bt >= at ? b : a;
+      var at = getSessionTimeMs(a);
+      var bt = getSessionTimeMs(b);
+      if (bt === at) {
+        return b && b.sessionId ? b : a;
+      }
+      return bt > at ? b : a;
     }
 
     function rebuildDailyQuizCounts(history, localCounts, cloudCounts) {
@@ -3958,6 +3855,14 @@
         return Promise.resolve(false);
       }
 
+      if (round) {
+        flushProgressNow({ reason: reason || 'active-round-defer' });
+        syncState.pendingPush = true;
+        syncState.deferSyncUntilRoundEnds = true;
+        setSyncStatus('syncing', 'Sync after round');
+        return Promise.resolve(false);
+      }
+
       syncState.isSyncing = true;
       setSyncStatus('syncing', 'Syncing...');
 
@@ -3979,6 +3884,12 @@
           }
           return downloadDriveProgress(fileId).then(function (driveData) {
             var cloudProgress = unwrapDriveProgress(driveData);
+            if (round) {
+              syncState.pendingPush = true;
+              syncState.deferSyncUntilRoundEnds = true;
+              setSyncStatus('syncing', 'Sync after round');
+              return { uploaded: false, deferredDuringRound: true };
+            }
             var localProgress = loadProgress();
             var localFingerprint = progressFingerprint(localProgress);
             var cloudFingerprint = cloudProgress ? progressFingerprint(cloudProgress) : '';
@@ -3987,20 +3898,6 @@
             var localNeedsUpdate = mergedFingerprint !== localFingerprint;
             var cloudNeedsPush = hadPendingPushAtStart && (currentHash !== syncState.lastSyncedLocalHash || counterSnapshot > syncState.lastSyncedLocalSaveCounter);
             var cloudNeedsUpdate = !cloudProgress || (cloudNeedsPush && mergedFingerprint !== cloudFingerprint) || cloudFingerprint === localFingerprint && mergedFingerprint !== cloudFingerprint;
-
-            graphDebugLog('syncNow merge decision', {
-              reason: reason || 'sync-now',
-              hadPendingPushAtStart: hadPendingPushAtStart,
-              counterSnapshot: counterSnapshot,
-              localNeedsUpdate: localNeedsUpdate,
-              cloudNeedsUpdate: cloudNeedsUpdate,
-              cloudNeedsPush: cloudNeedsPush,
-              roundActive: !!round,
-              roundProgressSummary: round && round.progress ? getGraphDebugProgressSummary(round.progress) : null,
-              localSummary: getGraphDebugProgressSummary(localProgress),
-              cloudSummary: getGraphDebugProgressSummary(cloudProgress || blankProgress()),
-              mergedSummary: getGraphDebugProgressSummary(merged)
-            });
 
             if (localNeedsUpdate) {
               saveProgressLocalOnly(merged, 'cloud-merge');
@@ -4021,6 +3918,13 @@
         })
         .then(function (result) {
           syncState.isSyncing = false;
+          if (result && result.deferredDuringRound) {
+            syncState.pendingPush = true;
+            syncState.deferSyncUntilRoundEnds = true;
+            syncState.lastPollAt = nowMs();
+            setSyncStatus('syncing', 'Sync after round');
+            return false;
+          }
           syncState.pendingPush = false;
           syncState.lastPullAt = nowMs();
           syncState.lastPollAt = nowMs();
@@ -4064,6 +3968,12 @@
     function pushLocalToDrive(reason, counterSnapshot) {
       if (SHARED_DEVICE_MODE && !isGooglePracticeSession()) return Promise.resolve(false);
       if (!syncState.signedIn) return Promise.resolve(false);
+      if (round) {
+        syncState.pendingPush = true;
+        syncState.deferSyncUntilRoundEnds = true;
+        setSyncStatus('syncing', 'Sync after round');
+        return Promise.resolve(false);
+      }
       if (!navigator.onLine) {
         setSyncStatus('offline', 'Offline - will sync later');
         return Promise.resolve(false);
@@ -4107,13 +4017,7 @@
           return;
         }
         var counterSnapshot = syncState.localSaveCounter;
-        graphDebugLog('queueDrivePush firing', {
-          reason: reason || 'queued-push',
-          counterSnapshot: counterSnapshot,
-          snapshot: getGraphDebugProgressSummary(getProgressSnapshot())
-        });
         pushLocalToDrive(reason || 'queued-push', counterSnapshot).catch(function (e) {
-          graphDebugWarn('queueDrivePush failed', { reason: reason || 'queued-push', message: e && e.message, status: e && e.status });
           syncState.pendingPush = true;
           syncState.lastError = e;
           handleSyncBlockState(e);
@@ -5388,6 +5292,12 @@
       renderProgressGraph(finalProgress);
       updatePracticeHeader(finalProgress);
       flushProgressNow({ reason: 'stop-round' });
+      if (syncState.deferSyncUntilRoundEnds) {
+        syncState.deferSyncUntilRoundEnds = false;
+        if (syncState.signedIn && navigator.onLine) {
+          scheduleCloudSync('after-round');
+        }
+      }
     }
 
     function updateTimer() {
@@ -6053,30 +5963,41 @@
     }
 
     function recordSessionComplete(progress) {
+      var completedAt;
+      var nextSessionNumber;
+      var masteryBreakdown;
+      var levelsPassed;
+      var inProgressCount;
+      var accuracy;
+      var fpm;
+      var masteryScore;
+      var entry;
+
       if (!round || round.attempted <= 0) return false;
-      var debugBeforeHistoryLength = progress && progress.sessionHistory ? progress.sessionHistory.length : 0;
-      graphDebugLog('recordSessionComplete start', {
-        attempted: round.attempted,
-        correct: round.correct,
-        before: getGraphDebugProgressSummary(progress)
-      });
-      progress.sessionsCompleted = (progress.sessionsCompleted || 0) + 1;
+
       if (!progress.dailyQuizCounts) progress.dailyQuizCounts = {};
+      if (!progress.sessionHistory) progress.sessionHistory = [];
+
+      nextSessionNumber = Math.max(Number(progress.sessionsCompleted) || 0, progress.sessionHistory.length) + 1;
+      progress.sessionsCompleted = nextSessionNumber;
+
       var todayKey = getLocalDateKey();
       progress.dailyQuizCounts[todayKey] = (progress.dailyQuizCounts[todayKey] || 0) + 1;
-      if (!progress.sessionHistory) progress.sessionHistory = [];
-      var masteryBreakdown = getMasteryBreakdown(progress);
-      var levelsPassed = masteryBreakdown.fluent;
-      var inProgressCount = masteryBreakdown.inProgress;
-      var accuracy = round ? (round.correct / Math.max(1, round.attempted)) : 0;
-      var fpm = round ? Math.round(getRoundFpm(round) * 10) / 10 : 0;
+
+      masteryBreakdown = getMasteryBreakdown(progress);
+      levelsPassed = masteryBreakdown.fluent;
+      inProgressCount = masteryBreakdown.inProgress;
+      accuracy = round ? (round.correct / Math.max(1, round.attempted)) : 0;
+      fpm = round ? Math.round(getRoundFpm(round) * 10) / 10 : 0;
       if (fpm > (progress.allTimeBestFpm || 0)) progress.allTimeBestFpm = fpm;
-      var masteryScore = calculateOverallMasteryScore(levelsPassed, inProgressCount, accuracy, fpm);
-      progress.sessionHistory.push({
+      masteryScore = calculateOverallMasteryScore(levelsPassed, inProgressCount, accuracy, fpm);
+      completedAt = new Date().toISOString();
+
+      entry = {
         sessionId: (syncState.deviceId || getDeviceId()) + '-' + Date.now() + '-' + makeRandomSuffix(),
-        session: progress.sessionsCompleted,
-        date: new Date().toISOString(),
-        completedAt: new Date().toISOString(),
+        session: nextSessionNumber,
+        date: completedAt,
+        completedAt: completedAt,
         levelsPassed: levelsPassed,
         inProgressCount: inProgressCount,
         totalFacts: MASTERY_TOTAL_FACTS,
@@ -6085,16 +6006,11 @@
         accuracy: Math.round(accuracy * 100),
         fpm: fpm,
         currentTable: progress.currentTable,
-        at: new Date().toISOString()
-      });
+        at: completedAt
+      };
+
+      progress.sessionHistory.push(entry);
       if (progress.sessionHistory.length > 200) progress.sessionHistory.shift();
-      graphDebugLog('recordSessionComplete pushed', {
-        beforeHistoryLength: debugBeforeHistoryLength,
-        afterHistoryLength: progress.sessionHistory.length,
-        sessionsCompleted: progress.sessionsCompleted,
-        newSession: getGraphDebugSessionSummary(progress.sessionHistory[progress.sessionHistory.length - 1], progress.sessionHistory.length - 1),
-        summary: getGraphDebugProgressSummary(progress)
-      });
       setProgressInMemory(progress, 'record-session');
       return true;
     }
@@ -6206,10 +6122,39 @@
       return indexes;
     }
 
+    function normalizeSessionHistoryForGraph(history) {
+      var list = [];
+      var i;
+
+      history = Array.isArray(history) ? history : [];
+      for (i = 0; i < history.length; i += 1) {
+        if (!history[i]) continue;
+        var item = cloneJson(history[i]) || {};
+        item.sessionId = ensureSessionId(item, i);
+        item.date = getSessionDateValue(item);
+        item._graphTime = getSessionTimeMs(item);
+        item._graphOrder = i;
+        list.push(item);
+      }
+
+      list.sort(function (a, b) {
+        if (a._graphTime !== b._graphTime) return a._graphTime - b._graphTime;
+        return (Number(a._graphOrder) || 0) - (Number(b._graphOrder) || 0);
+      });
+
+      for (i = 0; i < list.length; i += 1) {
+        if (!list[i].session || Number(list[i].session) < 1) list[i].session = i + 1;
+        delete list[i]._graphTime;
+        delete list[i]._graphOrder;
+      }
+
+      return list;
+    }
+
     function renderProgressGraph(progress) {
       if (!el.progressGraph) return;
       progress = progress || (round && round.progress) || loadProgress();
-      var history = progress.sessionHistory || [];
+      var history = normalizeSessionHistoryForGraph(progress.sessionHistory || []);
 
       // Build all data points. Older history entries are re-scored with the newer grid-heavy formula.
       var allPoints = [];
@@ -6222,7 +6167,7 @@
           resultNumber: i + 1,
           masteryScore: clamp(ms, 0, 100),
           currentTable: item.currentTable || STARTING_TABLE,
-          date: item.at || null,
+          date: getSessionDateValue(item),
           accuracy: item.accuracy || null,
           fpm: item.fpm || null,
           levelsPassed: lp,
@@ -6297,29 +6242,6 @@
       visiblePoints.forEach(function (pt, idx) {
         path += (idx === 0 ? 'M' : 'L') + xPosByIndex(idx).toFixed(1) + ' ' + yPos(pt.masteryScore).toFixed(1) + ' ';
       });
-
-      var renderSignature = [
-        getGraphDebugSignature(progress),
-        'allPoints=' + allPoints.length,
-        'visiblePoints=' + visiblePoints.length,
-        'showAll=' + graphShowAllResults,
-        'path=' + path
-      ].join('|');
-      if (renderSignature !== graphDebugState.lastRenderSignature) {
-        graphDebugState.lastRenderSignature = renderSignature;
-        graphDebugLog('renderProgressGraph', {
-          historyLength: history.length,
-          allPointsLength: allPoints.length,
-          visiblePointsLength: visiblePoints.length,
-          graphShowAllResults: graphShowAllResults,
-          firstVisiblePoint: visiblePoints.length ? visiblePoints[0] : null,
-          lastVisiblePoint: visiblePoints.length ? visiblePoints[visiblePoints.length - 1] : null,
-          path: visiblePoints.length > 1 ? path : '',
-          pathWillRender: visiblePoints.length > 1,
-          rawHistoryTail: getGraphDebugHistoryTail(progress, 6),
-          allPointTail: allPoints.slice(Math.max(0, allPoints.length - 6))
-        });
-      }
 
       // Milestone markers: vertical dashed lines when currentTable advances within the visible range
       var milestones = [];
