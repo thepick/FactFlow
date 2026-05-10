@@ -1935,7 +1935,7 @@
     }
 
     function blankProgress() {
-      return { schemaVersion: PROGRESS_SCHEMA_VERSION, currentTable: STARTING_TABLE, factStats: {}, sessionsCompleted: 0, sessionHistory: [], allTimeBestStreak: 0, allTimeBestFpm: 0, dailyQuizCounts: {}, speedTargetFpm: DEFAULT_SPEED_TARGET_FPM, speedTargetUpdatedAtMs: 0, hasReachedLevel100: false };
+      return { schemaVersion: PROGRESS_SCHEMA_VERSION, currentTable: STARTING_TABLE, factStats: {}, sessionsCompleted: 0, sessionHistory: [], allTimeBestStreak: 0, allTimeBestFpm: 0, dailyQuizCounts: {}, dailyScoreBaselines: {}, speedTargetFpm: DEFAULT_SPEED_TARGET_FPM, speedTargetUpdatedAtMs: 0, hasReachedLevel100: false };
     }
 
     function normalizeProgressForSave(p) {
@@ -1948,6 +1948,7 @@
       if (p.allTimeBestStreak == null) p.allTimeBestStreak = 0;
       if (p.allTimeBestFpm == null) p.allTimeBestFpm = 0;
       if (!p.dailyQuizCounts) p.dailyQuizCounts = {};
+      p.dailyScoreBaselines = cleanDailyScoreBaselines(p.dailyScoreBaselines || {});
       if (!p.schemaVersion) p.schemaVersion = PROGRESS_SCHEMA_VERSION;
       p.speedTargetFpm = getValidSpeedTargetFpm(p.speedTargetFpm);
       if (p.speedTargetUpdatedAtMs == null) p.speedTargetUpdatedAtMs = 0;
@@ -2041,6 +2042,7 @@
         allTimeBestStreak: 0,
         allTimeBestFpm: 0,
         dailyQuizCounts: {},
+        dailyScoreBaselines: {},
         speedTargetFpm: DEFAULT_SPEED_TARGET_FPM,
         speedTargetUpdatedAtMs: 0,
         hasReachedLevel100: false
@@ -2054,6 +2056,7 @@
       if (!p.factStats) p.factStats = {};
       if (!p.sessionHistory) p.sessionHistory = [];
       if (!p.dailyQuizCounts) p.dailyQuizCounts = {};
+      p.dailyScoreBaselines = cleanDailyScoreBaselines(p.dailyScoreBaselines || {});
       if (p.allTimeBestStreak == null) p.allTimeBestStreak = 0;
       if (p.allTimeBestFpm == null) p.allTimeBestFpm = 0;
 
@@ -2276,6 +2279,144 @@
       return y + '-' + m + '-' + day;
     }
 
+    function getDailyScoreBaselineCutoffKey() {
+      var d = new Date();
+      d.setDate(d.getDate() - 14);
+      return getLocalDateKey(d);
+    }
+
+    function normalizeDailyScoreBaselineEntry(entry) {
+      var out;
+      var score;
+
+      if (entry == null) return null;
+
+      if (typeof entry === 'number') {
+        entry = { score: entry };
+      }
+
+      if (typeof entry !== 'object') return null;
+
+      score = Number(entry.score);
+      if (!isFinite(score)) return null;
+
+      out = {
+        score: Math.round(score),
+        dailyCountAtStart: Math.max(0, Number(entry.dailyCountAtStart) || 0),
+        sessionsAtStart: Math.max(0, Number(entry.sessionsAtStart) || 0),
+        createdAt: entry.createdAt || nowIso()
+      };
+
+      return out;
+    }
+
+    function cleanDailyScoreBaselines(baselines) {
+      var out = {};
+      var key;
+      var cutoffKey = getDailyScoreBaselineCutoffKey();
+      var entry;
+
+      baselines = baselines || {};
+
+      for (key in baselines) {
+        if (Object.prototype.hasOwnProperty.call(baselines, key)) {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) continue;
+          if (key < cutoffKey) continue;
+          entry = normalizeDailyScoreBaselineEntry(baselines[key]);
+          if (entry) out[key] = entry;
+        }
+      }
+
+      return out;
+    }
+
+    function mergeDailyScoreBaselines(a, b) {
+      var out = cleanDailyScoreBaselines(a || {});
+      var other = cleanDailyScoreBaselines(b || {});
+      var key;
+      var existing;
+      var incoming;
+
+      for (key in other) {
+        if (Object.prototype.hasOwnProperty.call(other, key)) {
+          incoming = other[key];
+          existing = out[key];
+
+          if (!existing ||
+              incoming.dailyCountAtStart < existing.dailyCountAtStart ||
+              (incoming.dailyCountAtStart === existing.dailyCountAtStart && String(incoming.createdAt || '') < String(existing.createdAt || ''))) {
+            out[key] = incoming;
+          }
+        }
+      }
+
+      return out;
+    }
+
+    function ensureDailyScoreBaseline(progress, todayKey, scoreBeforeRound) {
+      var score = Number(scoreBeforeRound);
+      var existing;
+
+      if (!progress || !todayKey || !isFinite(score)) return null;
+
+      if (!progress.dailyQuizCounts) progress.dailyQuizCounts = {};
+      progress.dailyScoreBaselines = cleanDailyScoreBaselines(progress.dailyScoreBaselines || {});
+      existing = normalizeDailyScoreBaselineEntry(progress.dailyScoreBaselines[todayKey]);
+
+      if (!existing) {
+        existing = {
+          score: Math.round(score),
+          dailyCountAtStart: Math.max(0, Number(progress.dailyQuizCounts[todayKey]) || 0),
+          sessionsAtStart: Math.max(0, Number(progress.sessionsCompleted) || 0),
+          createdAt: nowIso()
+        };
+        progress.dailyScoreBaselines[todayKey] = existing;
+      } else {
+        progress.dailyScoreBaselines[todayKey] = existing;
+      }
+
+      return existing;
+    }
+
+    function getDailyScoreNote(progress, todayKey, newScore) {
+      var baseline;
+      var currentDailyCount;
+      var startCount;
+      var diff;
+      var absDiff;
+      var word;
+      var score = Number(newScore);
+
+      if (!progress || !todayKey || !isFinite(score)) return '';
+      if (!progress.dailyQuizCounts) progress.dailyQuizCounts = {};
+      progress.dailyScoreBaselines = cleanDailyScoreBaselines(progress.dailyScoreBaselines || {});
+
+      baseline = normalizeDailyScoreBaselineEntry(progress.dailyScoreBaselines[todayKey]);
+      if (!baseline) return '';
+
+      currentDailyCount = Number(progress.dailyQuizCounts[todayKey]) || 0;
+      startCount = Number(baseline.dailyCountAtStart) || 0;
+
+      // Skip the daily summary for the first completed round after the baseline is set.
+      if (currentDailyCount < startCount + 2) return '';
+
+      diff = Math.round(score - Number(baseline.score));
+      if (!isFinite(diff)) return '';
+
+      absDiff = Math.abs(diff);
+      word = absDiff === 1 ? 'point' : 'points';
+
+      if (diff > 0) {
+        return 'Today, you are up ' + diff + ' ' + word + ' overall.';
+      }
+
+      if (diff === 0) {
+        return 'Today, your overall score is unchanged.';
+      }
+
+      return 'Today, you are ' + absDiff + ' ' + word + ' behind your starting score, but every round helps.';
+    }
+
     function getTodaysQuizCount(progress) {
       var p = progress || loadProgress();
       if (!p.dailyQuizCounts) p.dailyQuizCounts = {};
@@ -2322,7 +2463,7 @@
       }
     }
 
-    function buildScoreNote(prevScore, newScore, accuracy, fpm, graduated) {
+    function buildScoreNote(prevScore, newScore, accuracy, fpm, graduated, dailyScoreNote) {
       var diff = Math.round(newScore - prevScore);
       var accPct = Math.round(accuracy * 100);
       var target = getSpeedTargetFpm();
@@ -2349,6 +2490,7 @@
           note = 'Score dipped slightly - slow or timed-out answers lower the score a little.';
         }
       }
+      if (dailyScoreNote) note += ' ' + dailyScoreNote;
       return note;
     }
 
@@ -3491,6 +3633,7 @@
       merged.allTimeBestFpm = Math.max(Number(local.allTimeBestFpm) || 0, Number(cloud.allTimeBestFpm) || 0);
 
       merged.dailyQuizCounts = rebuildDailyQuizCounts(merged.sessionHistory, local.dailyQuizCounts, cloud.dailyQuizCounts);
+      merged.dailyScoreBaselines = mergeDailyScoreBaselines(local.dailyScoreBaselines, cloud.dailyScoreBaselines);
 
       merged.speedTargetFpm = chooseMergedSpeedTarget(local, cloud);
       merged.hasReachedLevel100 = !!(local.hasReachedLevel100 || cloud.hasReachedLevel100 || isLevel100ReviewMode(merged));
@@ -5567,12 +5710,15 @@
       var model = getActiveModel(progress);
       var graduated = checkGraduation(progress);
       var msg;
+      var todayKey = getLocalDateKey();
+      var dailyScoreNote = '';
 
       if (round && round.bestStreak > (progress.allTimeBestStreak || 0)) {
         progress.allTimeBestStreak = round.bestStreak;
         if (el.personalBestValue) el.personalBestValue.textContent = String(round.bestStreak);
       }
 
+      ensureDailyScoreBaseline(progress, todayKey, prevScore);
       recordSessionComplete(progress);
       updateTodaysQuizDisplay(progress);
       updateTotalQuizDisplay(progress);
@@ -5598,6 +5744,7 @@
       var newBreakdown = getMasteryBreakdown(progress);
       var newScore = calculateOverallMasteryScore(newBreakdown.fluent, newBreakdown.inProgress, prevAccuracy, prevFpm);
       var completedAllFacts = hasCompletedAllFacts(progress, newScore);
+      dailyScoreNote = getDailyScoreNote(progress, todayKey, newScore);
 
       if (completedAllFacts) {
         progress.hasReachedLevel100 = true;
@@ -5611,7 +5758,7 @@
           el.scoreNote.textContent = '';
           el.scoreNote.classList.remove('visible');
         } else {
-          el.scoreNote.textContent = buildScoreNote(prevScore, newScore, prevAccuracy, prevFpm, graduated);
+          el.scoreNote.textContent = buildScoreNote(prevScore, newScore, prevAccuracy, prevFpm, graduated, dailyScoreNote);
           el.scoreNote.classList.add('visible');
         }
       }
