@@ -1538,7 +1538,8 @@
 
     // Google Drive sync config.
     var GOOGLE_CLIENT_ID = '220590044784-6bohsjumu2r67ds92lhmfdubhh3qen5i.apps.googleusercontent.com';
-    var GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
+    var GOOGLE_DRIVE_APPDATA_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+    var GOOGLE_DRIVE_SCOPE = GOOGLE_DRIVE_APPDATA_SCOPE + ' https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
     var DRIVE_FILE_NAME = 'factflow_data.json';
     var DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3';
     var DRIVE_UPLOAD_BASE = 'https://www.googleapis.com/upload/drive/v3';
@@ -1629,6 +1630,7 @@
     var roundTimer = null;
     var roundEndsAt = 0;
     var lastProblemKey = null;
+    var lastProblemInfo = null;
     var timeoutTimer = null;
     var cooldownUntil = 0;
     var cooldownFactKey = null;  // Bug M1 fix: track which fact triggered the cooldown
@@ -1686,7 +1688,9 @@
       permissionBlocked: false,
       lastSyncedLocalHash: '',
       lastPollAt: 0,
-      needsSyncAfterCurrent: false
+      needsSyncAfterCurrent: false,
+      permissionRetryAttempted: false,
+      tokenRefreshInFlight: false
     };
 
     var syncDebounceTimer = null;
@@ -1930,7 +1934,7 @@
     }
 
     function blankProgress() {
-      return { schemaVersion: PROGRESS_SCHEMA_VERSION, currentTable: STARTING_TABLE, factStats: {}, sessionsCompleted: 0, sessionHistory: [], allTimeBestStreak: 0, allTimeBestFpm: 0, dailyQuizCounts: {}, speedTargetFpm: DEFAULT_SPEED_TARGET_FPM, speedTargetUpdatedAtMs: 0 };
+      return { schemaVersion: PROGRESS_SCHEMA_VERSION, currentTable: STARTING_TABLE, factStats: {}, sessionsCompleted: 0, sessionHistory: [], allTimeBestStreak: 0, allTimeBestFpm: 0, dailyQuizCounts: {}, speedTargetFpm: DEFAULT_SPEED_TARGET_FPM, speedTargetUpdatedAtMs: 0, hasReachedLevel100: false };
     }
 
     function normalizeProgressForSave(p) {
@@ -1946,6 +1950,7 @@
       if (!p.schemaVersion) p.schemaVersion = PROGRESS_SCHEMA_VERSION;
       p.speedTargetFpm = getValidSpeedTargetFpm(p.speedTargetFpm);
       if (p.speedTargetUpdatedAtMs == null) p.speedTargetUpdatedAtMs = 0;
+      p.hasReachedLevel100 = p.hasReachedLevel100 === true;
       return p;
     }
 
@@ -2036,7 +2041,8 @@
         allTimeBestFpm: 0,
         dailyQuizCounts: {},
         speedTargetFpm: DEFAULT_SPEED_TARGET_FPM,
-        speedTargetUpdatedAtMs: 0
+        speedTargetUpdatedAtMs: 0,
+        hasReachedLevel100: false
       };
     }
 
@@ -2056,6 +2062,8 @@
       }
 
       p.speedTargetFpm = getValidSpeedTargetFpm(p.speedTargetFpm);
+      if (p.speedTargetUpdatedAtMs == null) p.speedTargetUpdatedAtMs = 0;
+      p.hasReachedLevel100 = p.hasReachedLevel100 === true;
 
       return p;
     }
@@ -2091,6 +2099,8 @@
       if (out.lastWeakAt == null) out.lastWeakAt = 0;
       if (out.lastHelpAt == null) out.lastHelpAt = 0;
       if (!out.lastStatus) out.lastStatus = 'empty';
+      if (out.introduced == null) out.introduced = (Number(out.shown) || 0) > 0;
+      if (out.introducedAt == null) out.introducedAt = 0;
 
       return out;
     }
@@ -2532,7 +2542,7 @@
       if (!e) return detail ? 'Sync needs attention.' : 'Sync needs attention';
 
       if (e.message === 'TOKEN_EXPIRED' || e.message === 'NO_TOKEN' || e.status === 401) {
-        return detail ? 'Google sign-in expired. Sign in again.' : 'Sign in again to sync';
+        return detail ? 'Google sign-in expired. Reconnecting...' : 'Reconnecting...';
       }
 
       if (e.googleReason === 'storageQuotaExceeded') {
@@ -2540,7 +2550,7 @@
       }
 
       if (e.googleReason === 'insufficientPermissions' || e.googleReason === 'insufficientFilePermissions') {
-        return detail ? 'Google Drive permission was blocked. Sign out and sign in again.' : 'No access';
+        return detail ? 'Google Drive permission is needed. Please allow Drive sync.' : 'No access';
       }
 
       if (e.googleReason === 'rateLimitExceeded' || e.googleReason === 'userRateLimitExceeded') {
@@ -2744,30 +2754,76 @@
         setSyncStatus('error', 'Google sync is still loading');
         return;
       }
+      syncState.permissionRetryAttempted = false;
       setSyncStatus('syncing', 'Opening Google sign-in...');
 
       syncState.tokenClient.requestAccessToken({ prompt: 'select_account' });
     }
 
+    function tokenResponseIncludesScope(tokenResponse, scope) {
+      var grantedScopes;
+      var i;
+
+      if (!tokenResponse || !scope) return false;
+
+      if (window.google && google.accounts && google.accounts.oauth2 && typeof google.accounts.oauth2.hasGrantedAllScopes === 'function') {
+        return google.accounts.oauth2.hasGrantedAllScopes(tokenResponse, scope);
+      }
+
+      if (typeof tokenResponse.scope === 'string') {
+        grantedScopes = tokenResponse.scope.split(/\s+/);
+        for (i = 0; i < grantedScopes.length; i += 1) {
+          if (grantedScopes[i] === scope) return true;
+        }
+        return false;
+      }
+
+      // Older GIS responses may omit the scope field. Do not block sign-in when
+      // the helper and scope list are unavailable; Drive API calls will still be checked.
+      return true;
+    }
+
+    function hasRequiredGoogleScopes(tokenResponse) {
+      return !!(tokenResponse && tokenResponse.access_token && tokenResponseIncludesScope(tokenResponse, GOOGLE_DRIVE_APPDATA_SCOPE));
+    }
+
+    function makeGoogleScopeError() {
+      var err = new Error('MISSING_GOOGLE_DRIVE_SCOPE');
+      err.status = 403;
+      err.googleReason = 'insufficientPermissions';
+      err.googleMessage = 'Google Drive app data permission was not granted.';
+      return err;
+    }
+
     function requestGoogleTokenRefresh(promptValue) {
       if (!syncState.tokenClient) return Promise.reject(new Error('Google auth is not ready'));
+      if (syncState.tokenRefreshInFlight) return Promise.reject(new Error('TOKEN_REFRESH_IN_PROGRESS'));
+
+      syncState.tokenRefreshInFlight = true;
+
       return new Promise(function (resolve, reject) {
         var oldCallback = syncState.tokenClient.callback;
         var finished = false;
         var timeoutId = setTimeout(function () {
           if (finished) return;
           finished = true;
+          syncState.tokenRefreshInFlight = false;
           syncState.tokenClient.callback = oldCallback;
           reject(new Error('Token refresh timed out'));
-        }, 8000);
+        }, 15000);
 
         syncState.tokenClient.callback = function (tokenResponse) {
           if (finished) return;
           finished = true;
           clearTimeout(timeoutId);
+          syncState.tokenRefreshInFlight = false;
           syncState.tokenClient.callback = oldCallback;
           if (!tokenResponse || tokenResponse.error) {
             reject(new Error(tokenResponse && tokenResponse.error ? tokenResponse.error : 'Token refresh failed'));
+            return;
+          }
+          if (!hasRequiredGoogleScopes(tokenResponse)) {
+            reject(makeGoogleScopeError());
             return;
           }
           applyTokenResponse(tokenResponse);
@@ -2779,6 +2835,7 @@
           if (!finished) {
             finished = true;
             clearTimeout(timeoutId);
+            syncState.tokenRefreshInFlight = false;
             syncState.tokenClient.callback = oldCallback;
             reject(e);
           }
@@ -2787,11 +2844,43 @@
     }
 
     function handleTokenResponse(tokenResponse) {
-      console.log('[FactFlow Sync] handleTokenResponse', { hasToken: !!tokenResponse, error: tokenResponse && tokenResponse.error });
+      console.log('[FactFlow Sync] handleTokenResponse', {
+        hasToken: !!tokenResponse,
+        error: tokenResponse && tokenResponse.error,
+        scope: tokenResponse && tokenResponse.scope
+      });
+
       if (!tokenResponse || tokenResponse.error) {
         setSyncStatus('error', 'Google sign-in failed');
         return;
       }
+
+      if (!hasRequiredGoogleScopes(tokenResponse)) {
+        syncState.lastError = makeGoogleScopeError();
+        syncState.permissionBlocked = true;
+        syncState.pendingPush = true;
+
+        if (!syncState.permissionRetryAttempted) {
+          syncState.permissionRetryAttempted = true;
+          setSyncStatus('syncing', 'Google Drive permission needed...');
+          requestGoogleTokenRefresh('consent')
+            .then(function () {
+              clearSyncBlockState();
+              onGoogleSignedIn();
+            })
+            .catch(function (e) {
+              syncState.lastError = e;
+              handleSyncBlockState(e);
+              setSyncStatus('error', getSyncErrorMessage(e));
+            });
+          return;
+        }
+
+        setSyncStatus('error', getSyncErrorMessage(syncState.lastError));
+        return;
+      }
+
+      clearSyncBlockState();
       applyTokenResponse(tokenResponse);
       onGoogleSignedIn();
     }
@@ -2801,6 +2890,7 @@
       syncState.tokenExpiresAt = nowMs() + ((tokenResponse.expires_in || 3600) - 60) * 1000;
       syncState.signedIn = true;
       syncState.lastError = null;
+      syncState.permissionBlocked = false;
       setSyncEnabledBefore(true);
       saveTokenSession(tokenResponse);
       console.log('[FactFlow Sync] applyTokenResponse', {
@@ -2858,11 +2948,39 @@
             saveWorkingProgress(cloudProgress);
             markProgressMemoryClean(cloudProgress, 'cloud-progress-created');
             syncState.pendingPush = false;
-            syncState.lastSyncedLocalHash = getProgressHash(cloudProgress);
-            refreshProgressUi();
-            syncSpeedTargetSlider();
-            setPracticeLocked(false);
-            return true;
+            syncState.driveFileId = null;
+
+            return uploadDriveProgress(cloudProgress)
+              .then(function () {
+                syncState.lastSyncedLocalHash = getProgressHash(cloudProgress);
+                markLocalCounterSynced(syncState.localSaveCounter);
+                syncState.permissionRetryAttempted = false;
+                refreshProgressUi();
+                syncSpeedTargetSlider();
+                setPracticeLocked(false);
+                return true;
+              })
+              .catch(function (e) {
+                if (isRecoverableGoogleAuthError(e) && !syncState.permissionRetryAttempted) {
+                  syncState.permissionRetryAttempted = true;
+                  syncState.lastError = e;
+                  handleSyncBlockState(e);
+                  setSyncStatus('syncing', 'Google Drive permission needed...');
+                  return requestGoogleTokenRefresh('consent').then(function () {
+                    clearSyncBlockState();
+                    return uploadDriveProgress(cloudProgress).then(function () {
+                      syncState.lastSyncedLocalHash = getProgressHash(cloudProgress);
+                      markLocalCounterSynced(syncState.localSaveCounter);
+                      syncState.permissionRetryAttempted = false;
+                      refreshProgressUi();
+                      syncSpeedTargetSlider();
+                      setPracticeLocked(false);
+                      return true;
+                    });
+                  });
+                }
+                throw e;
+              });
           }
 
           return downloadDriveProgress(fileId).then(function (driveData) {
@@ -2876,6 +2994,7 @@
             syncState.localSaveCounter = 0;
             syncState.lastSyncedLocalSaveCounter = 0;
             syncState.lastSyncedLocalHash = cloudHash;
+            syncState.permissionRetryAttempted = false;
 
             refreshProgressUi();
             syncSpeedTargetSlider();
@@ -2909,10 +3028,27 @@
           })
           .catch(function (e) {
             syncState.lastError = e;
-            sessionMode = 'signed-out';
-            clearWorkingProgress();
-            clearProgressMemory();
-            setPracticeLocked(true, 'Sign in with Google to start.');
+            handleSyncBlockState(e);
+            if (isRecoverableGoogleAuthError(e) && !syncState.permissionRetryAttempted) {
+              syncState.permissionRetryAttempted = true;
+              setSyncStatus('syncing', 'Reconnecting Google sync...');
+              requestGoogleTokenRefresh(isPermissionError(e) ? 'consent' : '')
+                .then(function () {
+                  return hydrateGoogleProgressAfterSignIn();
+                })
+                .then(function () {
+                  startSyncPolling();
+                  setSyncStatus('synced', 'Synced');
+                })
+                .catch(function (retryError) {
+                  syncState.lastError = retryError;
+                  handleSyncBlockState(retryError);
+                  setPracticeLocked(true, getSyncErrorMessage(retryError, true));
+                  setSyncStatus('error', getSyncErrorMessage(retryError));
+                });
+              return;
+            }
+            setPracticeLocked(true, getSyncErrorMessage(e, true));
             setSyncStatus('error', getSyncErrorMessage(e));
           });
         return;
@@ -2959,6 +3095,8 @@
       syncState.isSyncing = false;
       syncState.quotaBlocked = false;
       syncState.permissionBlocked = false;
+      syncState.permissionRetryAttempted = false;
+      syncState.tokenRefreshInFlight = false;
       syncState.needsSyncAfterCurrent = false;
       syncState.lastSyncedLocalHash = '';
       syncState.lastPollAt = 0;
@@ -2983,6 +3121,46 @@
     // ═══════════════════════════ DRIVE FETCH ═══════════════════════════
     function isAuthError(e) {
       return e && (e.status === 401 || e.message === 'TOKEN_EXPIRED' || e.message === 'NO_TOKEN');
+    }
+
+    function isPermissionError(e) {
+      var message = '';
+
+      if (!e) return false;
+      if (e.googleReason === 'storageQuotaExceeded' ||
+          e.googleReason === 'rateLimitExceeded' ||
+          e.googleReason === 'userRateLimitExceeded' ||
+          e.googleReason === 'dailyLimitExceeded') {
+        return false;
+      }
+
+      if (e.message) message += String(e.message).toLowerCase() + ' ';
+      if (e.googleMessage) message += String(e.googleMessage).toLowerCase() + ' ';
+      if (e.googleStatus) message += String(e.googleStatus).toLowerCase() + ' ';
+
+      return !!(
+        e.googleReason === 'insufficientPermissions' ||
+        e.googleReason === 'insufficientFilePermissions' ||
+        message.indexOf('insufficient') !== -1 ||
+        message.indexOf('permission') !== -1 ||
+        message.indexOf('scope') !== -1
+      );
+    }
+
+    function isRecoverableGoogleAuthError(e) {
+      return !!(isAuthError(e) || isPermissionError(e));
+    }
+
+    function makeDriveApiError(prefix, response, text) {
+      var err = new Error(prefix + ': ' + response.status);
+      var googleError = parseGoogleApiErrorText(text);
+      err.status = response.status;
+      err.googleCode = googleError.code;
+      err.googleReason = googleError.reason;
+      err.googleMessage = googleError.message;
+      err.googleStatus = googleError.status;
+      err.responseText = text;
+      return err;
     }
 
     function driveFetch(url, options) {
@@ -3019,7 +3197,15 @@
       console.log('[FactFlow Sync] findDriveFile searching appDataFolder', { fileName: DRIVE_FILE_NAME });
 
       return driveFetch(url, { method: 'GET' })
-        .then(function (r) { return r.json(); })
+        .then(function (r) {
+          if (!r.ok) {
+            return r.text().then(function (text) {
+              console.error('[FactFlow Sync] Drive file search failed', r.status, text);
+              throw makeDriveApiError('Drive file search failed', r, text);
+            });
+          }
+          return r.json();
+        })
         .then(function (data) {
           var files = data.files || [];
           console.log('[FactFlow Sync] findDriveFile results', { fileCount: files.length, files: files.map(function(f) { return { id: f.id, name: f.name, modifiedTime: f.modifiedTime }; }) });
@@ -3292,6 +3478,7 @@
       merged.dailyQuizCounts = rebuildDailyQuizCounts(merged.sessionHistory, local.dailyQuizCounts, cloud.dailyQuizCounts);
 
       merged.speedTargetFpm = chooseMergedSpeedTarget(local, cloud);
+      merged.hasReachedLevel100 = !!(local.hasReachedLevel100 || cloud.hasReachedLevel100 || isLevel100ReviewMode(merged));
 
       // Settings are intentionally device-local.
       merged.settings = copySettings(state.settings);
@@ -3349,6 +3536,8 @@
       out.confidence = Math.max(Number(a.confidence) || 0, Number(b.confidence) || 0);
       out.lastWeakAt = Math.max(Number(a.lastWeakAt) || 0, Number(b.lastWeakAt) || 0);
       out.lastHelpAt = Math.max(Number(a.lastHelpAt) || 0, Number(b.lastHelpAt) || 0);
+      out.introduced = !!(a.introduced || b.introduced || out.shown > 0);
+      out.introducedAt = Math.max(Number(a.introducedAt) || 0, Number(b.introducedAt) || 0);
       out.lastStatus = getMoreConservativeStatus(a.lastStatus, b.lastStatus);
 
       return out;
@@ -3647,6 +3836,7 @@
           syncState.pendingPush = false;
           syncState.lastPullAt = nowMs();
           syncState.lastPollAt = nowMs();
+          syncState.permissionRetryAttempted = false;
           setSyncStatus('synced', 'Synced');
 
           if (syncState.needsSyncAfterCurrent) {
@@ -3659,23 +3849,23 @@
           syncState.isSyncing = false;
           syncState.lastError = e;
           handleSyncBlockState(e);
-          if (e.message === 'TOKEN_EXPIRED' || e.message === 'NO_TOKEN' || e.status === 401) {
-            syncState.signedIn = false;
-            syncState.accessToken = null;
-            syncState.tokenExpiresAt = 0;
-            clearTokenSession();
 
-            if (SHARED_DEVICE_MODE) {
-              if (round) {
-                stopRound(false);
-              }
-              sessionMode = 'signed-out';
-              stopSyncPolling();
-              clearWorkingProgress();
-              clearProgressMemory();
-              refreshProgressUi();
-              setPracticeLocked(true, 'Sign in with Google to start.');
-            }
+          if (isRecoverableGoogleAuthError(e) && !syncState.permissionRetryAttempted) {
+            syncState.permissionRetryAttempted = true;
+            syncState.pendingPush = true;
+            setSyncStatus('syncing', isPermissionError(e) ? 'Google Drive permission needed...' : 'Reconnecting Google sync...');
+            return requestGoogleTokenRefresh(isPermissionError(e) ? 'consent' : '')
+              .then(function () {
+                clearSyncBlockState();
+                return syncNow('token-refresh-retry');
+              })
+              .catch(function (retryError) {
+                syncState.lastError = retryError;
+                handleSyncBlockState(retryError);
+                syncState.pendingPush = true;
+                setSyncStatus('error', getSyncErrorMessage(retryError));
+                return false;
+              });
           }
 
           setSyncStatus('error', getSyncErrorMessage(e));
@@ -3696,6 +3886,7 @@
         markLocalCounterSynced(counterSnapshot);
         syncState.pendingPush = false;
         syncState.lastSyncedLocalHash = getProgressHash(getProgressSnapshot());
+        syncState.permissionRetryAttempted = false;
         setSyncStatus('synced', 'Synced');
         if (syncState.localSaveCounter > counterSnapshot && !syncState.saveTimer && !syncState.isSyncing) {
           scheduleCloudSync('pending-after-push');
@@ -3727,12 +3918,27 @@
           syncState.pendingPush = true;
           return;
         }
-        syncState.pendingPush = false;
         var counterSnapshot = syncState.localSaveCounter;
         pushLocalToDrive(reason || 'queued-push', counterSnapshot).catch(function (e) {
           syncState.pendingPush = true;
           syncState.lastError = e;
           handleSyncBlockState(e);
+          if (isRecoverableGoogleAuthError(e) && !syncState.permissionRetryAttempted) {
+            syncState.permissionRetryAttempted = true;
+            setSyncStatus('syncing', isPermissionError(e) ? 'Google Drive permission needed...' : 'Reconnecting Google sync...');
+            requestGoogleTokenRefresh(isPermissionError(e) ? 'consent' : '')
+              .then(function () {
+                clearSyncBlockState();
+                return pushLocalToDrive('token-refresh-push-retry', counterSnapshot);
+              })
+              .catch(function (retryError) {
+                syncState.pendingPush = true;
+                syncState.lastError = retryError;
+                handleSyncBlockState(retryError);
+                setSyncStatus('error', getSyncErrorMessage(retryError));
+              });
+            return;
+          }
           setSyncStatus('error', getSyncErrorMessage(e));
         });
       }, immediate ? 0 : SYNC_SAVE_DEBOUNCE_MS);
@@ -3788,6 +3994,48 @@
       var key = table + 'x' + second;
       if (!p.factStats) p.factStats = {};
       return p.factStats[key] || blankStats();
+    }
+
+    function getFactKey(table, second) {
+      return table + 'x' + second;
+    }
+
+    function isNewFactIntroductionDue(progress, table, second) {
+      var p = progress || loadProgress();
+      var key = getFactKey(table, second);
+      var s;
+
+      if (!p.factStats) p.factStats = {};
+      s = p.factStats[key];
+      if (!s) return true;
+
+      s = normalizeFactStatsV2(s);
+      p.factStats[key] = s;
+      return !s.introduced && (Number(s.shown) || 0) === 0;
+    }
+
+    function markFactIntroduced(progress, table, second, options) {
+      var p = progress || loadProgress();
+      var key = getFactKey(table, second);
+      var s;
+      var now = Date.now();
+
+      options = options || {};
+      if (!p.factStats) p.factStats = {};
+      if (!p.factStats[key]) p.factStats[key] = blankStats();
+
+      s = normalizeFactStatsV2(p.factStats[key]);
+      p.factStats[key] = s;
+
+      if (!s.introduced) {
+        s.introduced = true;
+        s.introducedAt = now;
+        if (!options.deferSave) {
+          saveProgressToStorage(p, { reason: 'new-fact-introduced' });
+        }
+      }
+
+      return p;
     }
 
     function schedulePracticeRender(progress) {
@@ -3906,7 +4154,8 @@
         shown: 0, correct: 0, incorrect: 0, timeouts: 0, avgMs: 0,
         mastery: 0, lastSeen: null, lastSeenTs: 0, lastResponseMs: 0,
         recent: [], fastStreak: 0, slowOrWrongCount: 0, cooldownUntil: 0,
-        masteryVersion: 2, confidence: 0, lastWeakAt: 0, lastHelpAt: 0, lastStatus: 'empty'
+        masteryVersion: 2, confidence: 0, lastWeakAt: 0, lastHelpAt: 0, lastStatus: 'empty',
+        introduced: false, introducedAt: 0
       };
     }
 
@@ -4474,9 +4723,158 @@
       return { weight: weight, overdueBoost: overdueBoost, timeoutBoost: timeoutBoost, struggleBoost: struggleBoost, fluencyPenalty: fluencyPenalty, status: status };
     }
 
-    function chooseNextProblem(blockedDisplayKey, progress) {
+    function makeFactFamilyKey(a, b) {
+      var left = Number(a);
+      var right = Number(b);
+      var smaller;
+      var larger;
+
+      if (!isFinite(left)) left = 0;
+      if (!isFinite(right)) right = 0;
+
+      smaller = Math.min(left, right);
+      larger = Math.max(left, right);
+      return smaller + 'x' + larger;
+    }
+
+    function shouldBlockImmediateProblem(candidate, previousProblem) {
+      if (!candidate || !previousProblem) return false;
+
+      // Exact repeats are never allowed back-to-back.
+      // Example: 6x7 followed by 6x7.
+      if (candidate.displayKey && candidate.displayKey === previousProblem.displayKey) return true;
+
+      // Reversed facts are allowed back-to-back only while the fact is still yellow/learning.
+      // Example: 6x7 followed by 7x6 is allowed only when the candidate fact is learning.
+      if (candidate.familyKey && candidate.familyKey === previousProblem.familyKey && candidate.status !== 'learning') return true;
+
+      return false;
+    }
+
+    function filterImmediateRepeatPool(pool, previousProblem) {
+      var strictPool;
+      var exactOnlyPool;
+
+      if (!previousProblem || !pool || !pool.length) return pool;
+
+      strictPool = pool.filter(function (item) {
+        return !shouldBlockImmediateProblem(item, previousProblem);
+      });
+      if (strictPool.length) return strictPool;
+
+      // If a very small pool ever makes the spacing rule impossible, keep the exact-repeat
+      // rule as the last protection and allow only a reversed-order fallback.
+      exactOnlyPool = pool.filter(function (item) {
+        return !item.displayKey || item.displayKey !== previousProblem.displayKey;
+      });
+      if (exactOnlyPool.length) return exactOnlyPool;
+
+      return pool;
+    }
+
+    function makeShuffledTableDeck() {
+      var deck = [];
+      var i;
+      var j;
+      var temp;
+
+      for (i = STARTING_TABLE; i <= MAX_TABLE; i += 1) {
+        deck.push(i);
+      }
+
+      for (i = deck.length - 1; i > 0; i -= 1) {
+        j = Math.floor(Math.random() * (i + 1));
+        temp = deck[i];
+        deck[i] = deck[j];
+        deck[j] = temp;
+      }
+
+      return deck;
+    }
+
+    function buildLevel100TablePool(table, previousProblem, progress) {
+      var pool = [];
+      var fallbackPool = [];
+
+      ALL_SECONDS.forEach(function (second) {
+        var stats = getFactStats(table, second, progress);
+        var pri = getPriorityBreakdown(stats);
+        var pres = choosePresentation(state.settings.orderMode, table, second);
+        var item = {
+          table: table, second: second,
+          left: pres.left, right: pres.right,
+          answer: table * second,
+          weight: pri.weight,
+          status: pri.status,
+          familyKey: makeFactFamilyKey(table, second),
+          displayKey: pres.left + 'x' + pres.right
+        };
+
+        fallbackPool.push(item);
+        pool.push(item);
+      });
+
+      pool = filterImmediateRepeatPool(pool, previousProblem);
+      return pool.length ? pool : filterImmediateRepeatPool(fallbackPool, previousProblem);
+    }
+
+    function chooseLevel100ReviewProblem(previousProblem, progress) {
+      var model = { table: MAX_TABLE, maxSecond: MAX_TABLE, activeFacts: ALL_SECONDS.slice() };
+      var deck;
+      var table;
+      var pool;
+      var attempts = 0;
+      var maxAttempts = (MAX_TABLE - STARTING_TABLE + 1) * 2;
+
+      if (round) {
+        if (!round.level100ReviewTableDeck || !round.level100ReviewTableDeck.length) {
+          round.level100ReviewTableDeck = makeShuffledTableDeck();
+        }
+        deck = round.level100ReviewTableDeck;
+
+        while (attempts < maxAttempts) {
+          if (!deck.length) {
+            round.level100ReviewTableDeck = makeShuffledTableDeck();
+            deck = round.level100ReviewTableDeck;
+          }
+
+          table = deck.shift();
+          pool = buildLevel100TablePool(table, previousProblem, progress);
+          if (pool.length) {
+            return {
+              problem: weightedPick(pool),
+              fromReview: true,
+              model: model,
+              level100Review: true
+            };
+          }
+
+          attempts += 1;
+        }
+      }
+
+      table = STARTING_TABLE + Math.floor(Math.random() * (MAX_TABLE - STARTING_TABLE + 1));
+      pool = buildLevel100TablePool(table, previousProblem, progress);
+      if (!pool.length) return null;
+
+      return {
+        problem: weightedPick(pool),
+        fromReview: true,
+        model: model,
+        level100Review: true
+      };
+    }
+
+    function chooseNextProblem(previousProblem, progress) {
       if (PERF_DEBUG) perfCounters.chooseNextProblem++;
       progress = progress || loadProgress();
+
+      if (isLevel100ReviewMode(progress)) {
+        progress.hasReachedLevel100 = true;
+        var level100Selection = chooseLevel100ReviewProblem(previousProblem, progress);
+        if (level100Selection) return level100Selection;
+      }
+
       var model = getActiveModel(progress);
       var now = Date.now();
       var reviewPct = state.settings.reviewMixPct / 100;
@@ -4493,16 +4891,16 @@
             left: pres.left, right: pres.right,
             answer: fac * second,
             weight: pri.weight,
-            familyKey: fac + 'x' + second,
+            status: pri.status,
+            familyKey: makeFactFamilyKey(fac, second),
             displayKey: pres.left + 'x' + pres.right
           };
         });
       }
 
-      // Prevent the exact same displayed fact from appearing twice in a row.
-      // Example: 2x6 followed by 2x6 is blocked, but 2x6 followed by 6x2 is allowed.
-      var currentPool = buildPool(model.activeFacts).filter(function (p) { return p.displayKey !== blockedDisplayKey; });
-      if (!currentPool.length) currentPool = buildPool(model.activeFacts);
+      // Prevent immediate repeats.
+      // Exact repeats are always blocked. Reversed-order repeats are allowed only while learning.
+      var currentPool = filterImmediateRepeatPool(buildPool(model.activeFacts), previousProblem);
 
       // Build review pool (mastered tables)
       var masteredTables = [];
@@ -4539,7 +4937,8 @@
             left: pres.left, right: pres.right,
             answer: tbl * sec,
             weight: weight,
-            familyKey: tbl + 'x' + sec,
+            status: status,
+            familyKey: makeFactFamilyKey(tbl, sec),
             displayKey: pres.left + 'x' + pres.right
           };
 
@@ -4551,8 +4950,8 @@
         });
       });
 
-      catchUpPool = catchUpPool.filter(function (p) { return p.displayKey !== blockedDisplayKey; });
-      reviewPool = reviewPool.filter(function (p) { return p.displayKey !== blockedDisplayKey; });
+      catchUpPool = filterImmediateRepeatPool(catchUpPool, previousProblem);
+      reviewPool = filterImmediateRepeatPool(reviewPool, previousProblem);
 
       // Decide which pool to draw from. Catch-up fixes older progress where a past row
       // was advanced before every fact in that row had been answered.
@@ -4567,7 +4966,7 @@
         var sec = model.activeFacts[0] || 2;
         var fac = model.table;
         return {
-          problem: { table: fac, second: sec, left: fac, right: sec, answer: fac * sec, weight: 1, familyKey: fac + 'x' + sec, displayKey: fac + 'x' + sec },
+          problem: { table: fac, second: sec, left: fac, right: sec, answer: fac * sec, weight: 1, status: 'learning', familyKey: makeFactFamilyKey(fac, sec), displayKey: fac + 'x' + sec },
           fromReview: false,
           model: model
         };
@@ -4726,6 +5125,7 @@
         startProgressSnapshot: cloneJson(progress) || null
       };
       lastProblemKey = null;
+      lastProblemInfo = null;
       clearTimeout(timeoutTimer);
       cooldownUntil = 0;
       wrongBurstCount = 0;
@@ -4824,19 +5224,29 @@
       wrongBurstCount = 0;
       wrongBurstStart = 0;
 
-      var selection = chooseNextProblem(lastProblemKey, progress);
+      var selection = chooseNextProblem(lastProblemInfo, progress);
       var p = selection.problem;
       round.currentProblem = p;
       round.problemStartTime = Date.now();
       round.hasRecordedWrong = false;
       lastProblemKey = p.displayKey;
+      lastProblemInfo = {
+        displayKey: p.displayKey,
+        familyKey: p.familyKey,
+        status: p.status || ''
+      };
+
+      var isNewFactIntro = isNewFactIntroductionDue(progress, round.currentProblem.table, round.currentProblem.second);
+      round.currentProblem.introMasteryFree = isNewFactIntro;
+      if (isNewFactIntro) {
+        progress = markFactIntroduced(progress, round.currentProblem.table, round.currentProblem.second);
+        round.progress = progress;
+        round.progressDirty = true;
+      }
 
       if (el.newFactLabel) {
-        var factKey = round.currentProblem.table + 'x' + round.currentProblem.second;
-        var nflStats = progress.factStats && progress.factStats[factKey];
-        var isNewFact = !nflStats || (nflStats.shown || 0) === 0;
-        if (isNewFact) {
-          el.newFactLabel.textContent = 'New fact!';
+        if (isNewFactIntro) {
+          el.newFactLabel.textContent = 'New fact: ' + round.currentProblem.left + ' \u00d7 ' + round.currentProblem.right + ' = ' + round.currentProblem.answer;
           el.newFactLabel.classList.add('visible');
         } else {
           el.newFactLabel.textContent = '';
@@ -4858,14 +5268,23 @@
       hideCooldown(); // Replace the purple slow-down message with the yellow answer-reveal banner.
       round.timeoutsTriggered++;
       var ms = Date.now() - round.problemStartTime;
-      round.progress = updateFactStats(
-        round.currentProblem.table,
-        round.currentProblem.second,
-        false,
-        ms,
-        true,
-        { progress: round.progress || loadProgress() }
-      );
+      if (round.currentProblem.introMasteryFree) {
+        round.progress = markFactIntroduced(
+          round.progress || loadProgress(),
+          round.currentProblem.table,
+          round.currentProblem.second,
+          { deferSave: true }
+        );
+      } else {
+        round.progress = updateFactStats(
+          round.currentProblem.table,
+          round.currentProblem.second,
+          false,
+          ms,
+          true,
+          { progress: round.progress || loadProgress() }
+        );
+      }
       round.progressDirty = true;
       schedulePostQuestionWork(round.progress);
       var answer = round.currentProblem.answer;
@@ -4886,10 +5305,12 @@
       var numeric = Number(raw);
       if (Number.isNaN(numeric)) return;
       if (numeric === expected) {
-        round.attempted++;
-        round.streak = 0;
-        if (el.currentStreakValue) el.currentStreakValue.textContent = '0';
-        updateStreakMeter(0);
+        if (!round.currentProblem.introMasteryFree) {
+          round.attempted++;
+          round.streak = 0;
+          if (el.currentStreakValue) el.currentStreakValue.textContent = '0';
+          updateStreakMeter(0);
+        }
         hideTimeoutOverlay();
         var progress = round.progress || loadProgress();
         nextProblem(progress);
@@ -4922,14 +5343,23 @@
 
         var ms = Date.now() - round.problemStartTime;
         var progress = round.progress || loadProgress();
-        progress = updateFactStats(
-          round.currentProblem.table,
-          round.currentProblem.second,
-          true,
-          ms,
-          false,
-          { progress: progress, deferRender: true }
-        );
+        if (round.currentProblem.introMasteryFree) {
+          progress = markFactIntroduced(
+            progress,
+            round.currentProblem.table,
+            round.currentProblem.second,
+            { deferSave: true }
+          );
+        } else {
+          progress = updateFactStats(
+            round.currentProblem.table,
+            round.currentProblem.second,
+            true,
+            ms,
+            false,
+            { progress: progress, deferRender: true }
+          );
+        }
 
         round.progress = progress;
         round.progressDirty = true;
@@ -4961,7 +5391,8 @@
       } else if (raw.length < String(expected).length) {
         hideFeedback();
       } else {
-        if (!round.hasRecordedWrong) {
+        var isIntroMasteryFree = !!round.currentProblem.introMasteryFree;
+        if (!isIntroMasteryFree && !round.hasRecordedWrong) {
           round.hasRecordedWrong = true;
           round.attempted++;
           round.streak = 0;
@@ -4977,33 +5408,35 @@
           );
           round.progressDirty = true;
         }
-        var nw = Date.now();
-        if (!wrongBurstStart || nw - wrongBurstStart > 9000) {
-          wrongBurstCount = 1; wrongBurstStart = nw;
-        } else {
-          wrongBurstCount++;
-        }
-        if (wrongBurstCount >= 2) {
-          cooldownUntil = nw + 3000;
-          cooldownFactKey = round.currentProblem ? currentFactKey : null;  // Bug M1 fix
-          el.cooldownBanner.textContent = 'Slow Down! Read carefully';
-          el.cooldownBanner.classList.add('active');
-          // PATCH v7: input stays live - banner flashes briefly, no blocking delay
-          wrongBurstCount = 0; wrongBurstStart = 0;
-          if (INPUT_COOLDOWN_MS > 0) {
-            cooldownUntil = Date.now() + INPUT_COOLDOWN_MS;
-            cooldownFactKey = round.currentProblem ? (round.currentProblem.left + 'x' + round.currentProblem.right) : null;
-            el.answerInput.disabled = true;
-            setTimeout(endCooldown, INPUT_COOLDOWN_MS);
+        if (!isIntroMasteryFree) {
+          var nw = Date.now();
+          if (!wrongBurstStart || nw - wrongBurstStart > 9000) {
+            wrongBurstCount = 1; wrongBurstStart = nw;
           } else {
-            cooldownUntil = 0;
-            cooldownFactKey = null;
-            if (cooldownHideTimer) { clearTimeout(cooldownHideTimer); cooldownHideTimer = null; }
-            if (COOLDOWN_HINT_MS > 0) {
-              cooldownHideTimer = setTimeout(function() {
-                cooldownHideTimer = null;
-                hideCooldown();
-              }, COOLDOWN_HINT_MS);
+            wrongBurstCount++;
+          }
+          if (wrongBurstCount >= 2) {
+            cooldownUntil = nw + 3000;
+            cooldownFactKey = round.currentProblem ? currentFactKey : null;  // Bug M1 fix
+            el.cooldownBanner.textContent = 'Slow Down! Read carefully';
+            el.cooldownBanner.classList.add('active');
+            // PATCH v7: input stays live - banner flashes briefly, no blocking delay
+            wrongBurstCount = 0; wrongBurstStart = 0;
+            if (INPUT_COOLDOWN_MS > 0) {
+              cooldownUntil = Date.now() + INPUT_COOLDOWN_MS;
+              cooldownFactKey = round.currentProblem ? (round.currentProblem.left + 'x' + round.currentProblem.right) : null;
+              el.answerInput.disabled = true;
+              setTimeout(endCooldown, INPUT_COOLDOWN_MS);
+            } else {
+              cooldownUntil = 0;
+              cooldownFactKey = null;
+              if (cooldownHideTimer) { clearTimeout(cooldownHideTimer); cooldownHideTimer = null; }
+              if (COOLDOWN_HINT_MS > 0) {
+                cooldownHideTimer = setTimeout(function() {
+                  cooldownHideTimer = null;
+                  hideCooldown();
+                }, COOLDOWN_HINT_MS);
+              }
             }
           }
         }
@@ -5063,6 +5496,7 @@
       var completedAllFacts = hasCompletedAllFacts(progress, newScore);
 
       if (completedAllFacts) {
+        progress.hasReachedLevel100 = true;
         msg = 'Amazing! You mastered all multiplication facts from x2 to x12! Your FactFlow mastery score is 100.';
       }
       setStatus(el.roundStatus, msg, (graduated || completedAllFacts) ? 'good' : '');
@@ -5244,6 +5678,12 @@
         score >= 100;
     }
 
+    function isLevel100ReviewMode(progress, scoreOverride) {
+      progress = progress || loadProgress();
+      if (progress.hasReachedLevel100 === true) return true;
+      return hasCompletedAllFacts(progress, scoreOverride);
+    }
+
     function getPrimaryActionLabel(progress) {
       return hasCompletedAllFacts(progress) ? 'Review All Facts' : 'Start Round';
     }
@@ -5325,6 +5765,10 @@
       var shouldCelebrate;
 
       console.log('[confetti] syncCompletionUi: completed=' + completed + ' round=' + !!round + ' optionCelebrate=' + options.celebrate + ' scoreArg=' + options.score);
+      if (completed) {
+        progress.hasReachedLevel100 = true;
+      }
+
       if (completed && !round) {
         shouldCelebrate = options.celebrate;
         if (typeof shouldCelebrate === 'undefined') {
