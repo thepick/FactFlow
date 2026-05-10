@@ -1603,6 +1603,10 @@
     // Change this number if you want the graph to show more or fewer recent quiz results by default.
     var GRAPH_DEFAULT_VISIBLE_RESULTS = 10;
 
+    // Debug build: leave this on while auditing why the graph is not accumulating points.
+    // Set to false after the issue is identified.
+    var GRAPH_DEBUG = true;
+
     // Mobile haptic feedback. Default is on. Students can turn it off in Settings.
     // Works when the browser exposes navigator.vibrate and the device allows vibration.
     var HAPTICS_DEFAULT_ON = true;
@@ -1648,6 +1652,12 @@
     var postQuestionWorkTimer = null;
 
     var PERF_DEBUG = false;
+    var graphDebugState = {
+      lastRenderSignature: '',
+      lastWorkingSaveSignature: '',
+      lastStorageWriteSignature: '',
+      lastMemorySignature: ''
+    };
     var perfCounters = {
       loadProgress: 0,
       saveProgress: 0,
@@ -1856,6 +1866,97 @@
       return Date.now();
     }
 
+    function getGraphDebugHistory(progress) {
+      if (!progress || !Array.isArray(progress.sessionHistory)) return [];
+      return progress.sessionHistory;
+    }
+
+    function getGraphDebugSessionSummary(session, index) {
+      if (!session) return null;
+      return {
+        index: index,
+        session: session.session,
+        sessionId: session.sessionId,
+        score: session.masteryScore != null ? session.masteryScore : session.score,
+        fpm: session.fpm,
+        accuracy: session.accuracy,
+        completedAt: session.completedAt,
+        date: session.date,
+        at: session.at
+      };
+    }
+
+    function getGraphDebugHistoryTail(progress, limit) {
+      var history = getGraphDebugHistory(progress);
+      var out = [];
+      var start = Math.max(0, history.length - (limit || 6));
+      var i;
+      for (i = start; i < history.length; i += 1) {
+        out.push(getGraphDebugSessionSummary(history[i], i));
+      }
+      return out;
+    }
+
+    function getGraphDebugSignature(progress) {
+      var history = getGraphDebugHistory(progress);
+      var last = history.length ? history[history.length - 1] : null;
+      return [
+        'sessionsCompleted=' + (progress && progress.sessionsCompleted != null ? progress.sessionsCompleted : ''),
+        'history=' + history.length,
+        'lastId=' + (last && last.sessionId ? last.sessionId : ''),
+        'lastSession=' + (last && last.session != null ? last.session : ''),
+        'lastScore=' + (last && last.masteryScore != null ? last.masteryScore : '')
+      ].join('|');
+    }
+
+    function getGraphDebugProgressSummary(progress) {
+      var history = getGraphDebugHistory(progress);
+      return {
+        sessionsCompleted: progress && progress.sessionsCompleted,
+        historyLength: history.length,
+        currentTable: progress && progress.currentTable,
+        historyTail: getGraphDebugHistoryTail(progress, 6)
+      };
+    }
+
+    function graphDebugLog(eventName, details) {
+      if (!GRAPH_DEBUG) return;
+      try {
+        if (window.console && console.log) {
+          console.log('[FactFlow Graph Debug] ' + eventName, details || {});
+        }
+      } catch (e) {}
+    }
+
+    function graphDebugWarn(eventName, details) {
+      if (!GRAPH_DEBUG) return;
+      try {
+        if (window.console && console.warn) {
+          console.warn('[FactFlow Graph Debug] ' + eventName, details || {});
+        } else {
+          graphDebugLog(eventName, details);
+        }
+      } catch (e) {}
+    }
+
+    function graphDebugSnapshot(label) {
+      var progress = null;
+      var summary;
+      try {
+        progress = (round && round.progress) || loadProgress({ force: true });
+        summary = getGraphDebugProgressSummary(progress);
+        graphDebugLog('manual snapshot' + (label ? ' - ' + label : ''), summary);
+        return summary;
+      } catch (e) {
+        graphDebugWarn('manual snapshot failed', { message: e && e.message, name: e && e.name });
+        return null;
+      }
+    }
+
+    try {
+      window.factflowGraphDebugSnapshot = graphDebugSnapshot;
+    } catch (e) {}
+
     function getValidSpeedTargetFpm(value) {
       value = Number(value);
       return SPEED_TARGET_OPTIONS.indexOf(value) > -1 ? value : DEFAULT_SPEED_TARGET_FPM;
@@ -1985,14 +2086,32 @@
     }
 
     function saveWorkingProgress(progress) {
+      var payload;
+      var signature;
+
       if (SHARED_DEVICE_MODE && !isGooglePracticeSession()) {
+        graphDebugLog('saveWorkingProgress skipped - not a Google practice session', getGraphDebugProgressSummary(progress));
         return false;
       }
 
       try {
-        sessionStorage.setItem(SIGNED_IN_WORKING_PROGRESS_KEY, JSON.stringify(progress || getBlankWorkingProgress()));
+        payload = JSON.stringify(progress || getBlankWorkingProgress());
+        sessionStorage.setItem(SIGNED_IN_WORKING_PROGRESS_KEY, payload);
+        signature = getGraphDebugSignature(progress || getBlankWorkingProgress());
+        if (signature !== graphDebugState.lastWorkingSaveSignature) {
+          graphDebugState.lastWorkingSaveSignature = signature;
+          graphDebugLog('saveWorkingProgress success', {
+            payloadBytes: payload ? payload.length : 0,
+            summary: getGraphDebugProgressSummary(progress || getBlankWorkingProgress())
+          });
+        }
         return true;
       } catch (e) {
+        graphDebugWarn('saveWorkingProgress failed', {
+          message: e && e.message,
+          name: e && e.name,
+          summary: getGraphDebugProgressSummary(progress || getBlankWorkingProgress())
+        });
         return false;
       }
     }
@@ -2136,7 +2255,18 @@
       }
 
       if (SHARED_DEVICE_MODE) {
-        saveWorkingProgress(progress);
+        var workingSaved = saveWorkingProgress(progress);
+        var storageSignature = (opts.reason || 'progress-change') + '|' + getGraphDebugSignature(progress);
+        if (storageSignature !== graphDebugState.lastStorageWriteSignature) {
+          graphDebugState.lastStorageWriteSignature = storageSignature;
+          graphDebugLog('writeProgressToStorageNow shared', {
+            reason: opts.reason || 'progress-change',
+            workingSaved: workingSaved,
+            localSaveCounterBefore: syncState.localSaveCounter,
+            pendingPushBefore: syncState.pendingPush,
+            summary: getGraphDebugProgressSummary(progress)
+          });
+        }
         syncState.localSaveCounter += 1;
         syncState.pendingPush = true;
         scheduleCloudSync(opts.reason || 'progress-change');
@@ -2185,6 +2315,16 @@
       progressStore.current = migrateProgress(progress || defaultProgress());
       progressStore.dirty = true;
       progressStore.lastReason = reason || 'progress-change';
+      var memorySignature = progressStore.lastReason + '|' + getGraphDebugSignature(progressStore.current);
+      if (memorySignature !== graphDebugState.lastMemorySignature) {
+        graphDebugState.lastMemorySignature = memorySignature;
+        graphDebugLog('setProgressInMemory', {
+          reason: progressStore.lastReason,
+          dirty: progressStore.dirty,
+          roundAttachedToSameObject: !!(round && round.progress === progressStore.current),
+          summary: getGraphDebugProgressSummary(progressStore.current)
+        });
+      }
       return progressStore.current;
     }
 
@@ -2240,6 +2380,13 @@
     function saveProgressToStorage(progress, opts) {
       opts = opts || {};
 
+      graphDebugLog('saveProgressToStorage called', {
+        reason: opts.reason || 'progress-change',
+        flushNow: !!opts.flushNow,
+        skipSync: !!opts.skipSync,
+        summary: getGraphDebugProgressSummary(progress)
+      });
+
       setProgressInMemory(progress, opts.reason || 'progress-change');
 
       if (opts.flushNow) {
@@ -2250,6 +2397,11 @@
     }
 
     function saveProgressLocalOnly(progress, reason) {
+      graphDebugLog('saveProgressLocalOnly called', {
+        reason: reason || 'local-only',
+        roundActive: !!round,
+        summary: getGraphDebugProgressSummary(progress)
+      });
       if (SHARED_DEVICE_MODE) {
         saveWorkingProgress(progress);
         markProgressMemoryClean(progress, reason || 'local-only');
@@ -3470,6 +3622,13 @@
       merged.factStats = mergeFactStats(local.factStats || {}, cloud.factStats || {});
       merged.sessionHistory = mergeSessionHistory(local.sessionHistory || [], cloud.sessionHistory || []);
 
+      graphDebugLog('mergeProgress session histories', {
+        local: getGraphDebugProgressSummary(local),
+        cloud: getGraphDebugProgressSummary(cloud),
+        mergedHistoryLength: merged.sessionHistory.length,
+        mergedHistoryTail: getGraphDebugHistoryTail({ sessionHistory: merged.sessionHistory }, 6)
+      });
+
       merged.sessionsCompleted = merged.sessionHistory.length;
 
       merged.allTimeBestStreak = Math.max(Number(local.allTimeBestStreak) || 0, Number(cloud.allTimeBestStreak) || 0);
@@ -3592,6 +3751,7 @@
     function mergeSessionHistory(aHistory, bHistory) {
       var map = {};
       var list = [];
+      var duplicateCount = 0;
 
       function addSession(s) {
         if (!s) return;
@@ -3601,6 +3761,12 @@
           map[copy.sessionId] = copy;
           list.push(copy);
         } else {
+          duplicateCount += 1;
+          graphDebugWarn('mergeSessionHistory duplicate sessionId', {
+            sessionId: copy.sessionId,
+            existing: getGraphDebugSessionSummary(map[copy.sessionId], -1),
+            incoming: getGraphDebugSessionSummary(copy, -1)
+          });
           map[copy.sessionId] = mergeOneSession(map[copy.sessionId], copy);
         }
       }
@@ -3623,6 +3789,14 @@
       for (i = 0; i < list.length; i += 1) {
         list[i].session = i + 1;
       }
+
+      graphDebugLog('mergeSessionHistory result', {
+        localInputLength: aHistory.length,
+        cloudInputLength: bHistory.length,
+        duplicateCount: duplicateCount,
+        outputLength: list.length,
+        outputTail: getGraphDebugHistoryTail({ sessionHistory: list }, 6)
+      });
 
       return list;
     }
@@ -3814,6 +3988,20 @@
             var cloudNeedsPush = hadPendingPushAtStart && (currentHash !== syncState.lastSyncedLocalHash || counterSnapshot > syncState.lastSyncedLocalSaveCounter);
             var cloudNeedsUpdate = !cloudProgress || (cloudNeedsPush && mergedFingerprint !== cloudFingerprint) || cloudFingerprint === localFingerprint && mergedFingerprint !== cloudFingerprint;
 
+            graphDebugLog('syncNow merge decision', {
+              reason: reason || 'sync-now',
+              hadPendingPushAtStart: hadPendingPushAtStart,
+              counterSnapshot: counterSnapshot,
+              localNeedsUpdate: localNeedsUpdate,
+              cloudNeedsUpdate: cloudNeedsUpdate,
+              cloudNeedsPush: cloudNeedsPush,
+              roundActive: !!round,
+              roundProgressSummary: round && round.progress ? getGraphDebugProgressSummary(round.progress) : null,
+              localSummary: getGraphDebugProgressSummary(localProgress),
+              cloudSummary: getGraphDebugProgressSummary(cloudProgress || blankProgress()),
+              mergedSummary: getGraphDebugProgressSummary(merged)
+            });
+
             if (localNeedsUpdate) {
               saveProgressLocalOnly(merged, 'cloud-merge');
               if (!round) refreshProgressUi();
@@ -3919,7 +4107,13 @@
           return;
         }
         var counterSnapshot = syncState.localSaveCounter;
+        graphDebugLog('queueDrivePush firing', {
+          reason: reason || 'queued-push',
+          counterSnapshot: counterSnapshot,
+          snapshot: getGraphDebugProgressSummary(getProgressSnapshot())
+        });
         pushLocalToDrive(reason || 'queued-push', counterSnapshot).catch(function (e) {
+          graphDebugWarn('queueDrivePush failed', { reason: reason || 'queued-push', message: e && e.message, status: e && e.status });
           syncState.pendingPush = true;
           syncState.lastError = e;
           handleSyncBlockState(e);
@@ -5860,6 +6054,12 @@
 
     function recordSessionComplete(progress) {
       if (!round || round.attempted <= 0) return false;
+      var debugBeforeHistoryLength = progress && progress.sessionHistory ? progress.sessionHistory.length : 0;
+      graphDebugLog('recordSessionComplete start', {
+        attempted: round.attempted,
+        correct: round.correct,
+        before: getGraphDebugProgressSummary(progress)
+      });
       progress.sessionsCompleted = (progress.sessionsCompleted || 0) + 1;
       if (!progress.dailyQuizCounts) progress.dailyQuizCounts = {};
       var todayKey = getLocalDateKey();
@@ -5888,6 +6088,13 @@
         at: new Date().toISOString()
       });
       if (progress.sessionHistory.length > 200) progress.sessionHistory.shift();
+      graphDebugLog('recordSessionComplete pushed', {
+        beforeHistoryLength: debugBeforeHistoryLength,
+        afterHistoryLength: progress.sessionHistory.length,
+        sessionsCompleted: progress.sessionsCompleted,
+        newSession: getGraphDebugSessionSummary(progress.sessionHistory[progress.sessionHistory.length - 1], progress.sessionHistory.length - 1),
+        summary: getGraphDebugProgressSummary(progress)
+      });
       setProgressInMemory(progress, 'record-session');
       return true;
     }
@@ -6090,6 +6297,29 @@
       visiblePoints.forEach(function (pt, idx) {
         path += (idx === 0 ? 'M' : 'L') + xPosByIndex(idx).toFixed(1) + ' ' + yPos(pt.masteryScore).toFixed(1) + ' ';
       });
+
+      var renderSignature = [
+        getGraphDebugSignature(progress),
+        'allPoints=' + allPoints.length,
+        'visiblePoints=' + visiblePoints.length,
+        'showAll=' + graphShowAllResults,
+        'path=' + path
+      ].join('|');
+      if (renderSignature !== graphDebugState.lastRenderSignature) {
+        graphDebugState.lastRenderSignature = renderSignature;
+        graphDebugLog('renderProgressGraph', {
+          historyLength: history.length,
+          allPointsLength: allPoints.length,
+          visiblePointsLength: visiblePoints.length,
+          graphShowAllResults: graphShowAllResults,
+          firstVisiblePoint: visiblePoints.length ? visiblePoints[0] : null,
+          lastVisiblePoint: visiblePoints.length ? visiblePoints[visiblePoints.length - 1] : null,
+          path: visiblePoints.length > 1 ? path : '',
+          pathWillRender: visiblePoints.length > 1,
+          rawHistoryTail: getGraphDebugHistoryTail(progress, 6),
+          allPointTail: allPoints.slice(Math.max(0, allPoints.length - 6))
+        });
+      }
 
       // Milestone markers: vertical dashed lines when currentTable advances within the visible range
       var milestones = [];
