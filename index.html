@@ -2406,6 +2406,10 @@
         el.roundStatePill.textContent = locked ? 'Locked' : 'Ready';
       }
 
+      if (!locked && el.roundStatus && !round) {
+        setStatus(el.roundStatus, getPrimaryActionStatus(loadProgress()), '');
+      }
+
       setKeypadEnabled(!locked);
     }
 
@@ -5063,8 +5067,15 @@
       }
       setStatus(el.roundStatus, msg, (graduated || completedAllFacts) ? 'good' : '');
       if (el.scoreNote) {
-        el.scoreNote.textContent = completedAllFacts ? 'Amazing! You mastered all multiplication facts from x2 to x12! Your FactFlow mastery score is 100.' : buildScoreNote(prevScore, newScore, prevAccuracy, prevFpm, graduated);
-        el.scoreNote.classList.add('visible');
+        if (completedAllFacts) {
+          // Avoid showing a duplicate dark score note at final mastery.
+          // The green round status message already gives the Level 100 celebration.
+          el.scoreNote.textContent = '';
+          el.scoreNote.classList.remove('visible');
+        } else {
+          el.scoreNote.textContent = buildScoreNote(prevScore, newScore, prevAccuracy, prevFpm, graduated);
+          el.scoreNote.classList.add('visible');
+        }
       }
 
       saveProgressToStorage(progress, { reason: 'round-complete', flushNow: true });
@@ -5235,6 +5246,10 @@
 
     function getPrimaryActionLabel(progress) {
       return hasCompletedAllFacts(progress) ? 'Review All Facts' : 'Start Round';
+    }
+
+    function getPrimaryActionStatus(progress) {
+      return hasCompletedAllFacts(progress) ? 'Press Review All Facts when you\'re ready.' : 'Press Start when you\'re ready.';
     }
 
     function showCompletionCelebration(progress, options) {
@@ -5794,7 +5809,7 @@
       el.practiceLayout.classList.remove('hidden');
       uiProgress = loadProgress();
 
-      setStatus(el.roundStatus, locked ? 'Sign in with Google to start.' : 'Press Start when you\'re ready.', '');
+      setStatus(el.roundStatus, locked ? 'Sign in with Google to start.' : getPrimaryActionStatus(uiProgress), '');
       updatePracticeHeader(uiProgress);
       renderProgressGrid(uiProgress);
       renderProgressGraph(uiProgress);
