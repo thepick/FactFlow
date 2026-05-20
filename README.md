@@ -1,4 +1,4 @@
-# FactFlow
+﻿# FactFlow
 
 FactFlow is a multiplication fluency web app designed for student practice. It helps learners build speed, accuracy, and confidence with multiplication facts through short timed rounds, adaptive review, and clear progress tracking.
 
@@ -218,3 +218,30 @@ The app tracks how many rounds a student completes each day. The daily goal is *
 | Mastery | Facts turn dark green. Some may show as Review Soon when they need a little extra review. |
 | Graduation | Enough row progress triggers a move to the next times table, with a level-up message and confetti. |
 | Long-term | All facts from 2x2 to 12x12 are worked through. The mastery score climbs toward 100. |
+
+## Deployment notes for copies
+
+If you deploy your own copy of FactFlow, update the Google OAuth client ID in `index.html` before publishing.
+
+1. Open Google Cloud Console.
+2. Create or select a project.
+3. Enable the Google Drive API.
+4. Configure the OAuth consent screen.
+5. Create an OAuth 2.0 Client ID for a Web application.
+6. Add your exact site URL under Authorized JavaScript origins. For GitHub Pages, this usually looks like `https://YOUR-USERNAME.github.io`.
+7. Replace `GOOGLE_CLIENT_ID` in `index.html` with your own OAuth client ID.
+
+FactFlow uses Google Drive `appDataFolder` storage. This keeps the progress file separate from the student's normal visible Google Drive files.
+
+## Teacher settings
+
+Teacher-facing settings are intentionally kept in code rather than behind a password panel. To adjust defaults, edit the `APP_SETTINGS` object in `index.html`. Be careful to preserve valid JavaScript syntax when changing values.
+
+## One-device-at-a-time recommendation
+
+Students should not practice on two devices at the same time using the same Google account. FactFlow can merge progress across devices, but simultaneous active practice may cause confusing score changes or over-counted attempts.
+
+## Static files
+
+The favicon and Apple touch icon PNG files should stay in the same folder as `index.html`. If the celebration video has been extracted, keep `celebration.mp4` beside `index.html` as well.
+
