@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
@@ -214,7 +214,7 @@
     @keyframes toastPopIn { 0% { transform: translateX(-50%) translateY(-6px) scale(0.98); opacity: 0; } 100% { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; } }
     .hidden { display: none !important; }
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border-width: 0; }
-    /* â”€â”€ Progress Grid â”€â”€ */
+    /* ── Progress Grid ── */
     .pg-panel {
       padding: var(--space-3);
       overflow: hidden;
@@ -377,7 +377,7 @@
     .pg-legend .swatch.st { background: var(--cell-struggling); }
     .pg-legend .swatch.emp { background: var(--cell-empty); }
 
-    /* â”€â”€ Answer glow â”€â”€ */
+    /* ── Answer glow ── */
     .answer-input {
       transition: box-shadow 150ms ease, border-color 150ms ease, background-color 150ms ease;
     }
@@ -671,7 +671,7 @@
     }
 
 
-    /* â”€â”€â”€â”€ Floating mobile corner timer â”€â”€â”€â”€ */
+    /* ──── Floating mobile corner timer ──── */
     #mobileCornerTimer {
       display: none;
       position: fixed;
@@ -710,7 +710,7 @@
     }
     body.mobile-play-mode.round-active #mobileCornerTimer { display: block; }
 
-    /* â”€â”€â”€â”€ Settings dropdown â”€â”€â”€â”€ */
+    /* ──── Settings dropdown ──── */
     .settings-menu-wrap { position: relative; }
     .settings-dropdown {
       display: none; position: absolute; top: calc(100% + 8px); right: 0;
@@ -802,7 +802,7 @@
       margin-bottom: var(--space-2); max-width: none; line-height: 1.5;
     }
     .settings-confirm-box .settings-item { margin-bottom: var(--space-1); }
-    /* â”€â”€â”€â”€ Mobile haptics information button â”€â”€â”€â”€ */
+    /* ──── Mobile haptics information button ──── */
     .haptics-row {
       grid-template-columns: 32px minmax(0, 1fr) 24px 18px;
     }
@@ -830,7 +830,7 @@
       outline: none;
     }
 
-    /* â”€â”€â”€â”€ Speed target slider â”€â”€â”€â”€ */
+    /* ──── Speed target slider ──── */
     .speed-target-row {
       cursor: default;
       --speed-target-thumb-size: 24px;
@@ -955,7 +955,7 @@
     .graph-dot.speed-struggling {
       fill: var(--color-primary);
     }
-    /* â”€â”€â”€â”€ Level-up toast â”€â”€â”€â”€ */
+    /* ──── Level-up toast ──── */
     .levelup-toast {
       display: none; position: fixed; top: 72px; left: 50%;
       transform: translateX(-50%) translateY(-6px); opacity: 0;
@@ -1368,7 +1368,7 @@
       </div>
     </header>
 
-    <!-- â•â•â• PRACTICE VIEW â•â•â• -->
+    <!-- ═══ PRACTICE VIEW ═══ -->
     <section id="practiceView">
       <!-- Graduation banner -->
       <div class="graduate-banner" id="graduateBanner"></div>
@@ -1407,7 +1407,7 @@
                 <div class="streak-track">
                   <div class="streak-fill" id="streakFill"></div>
                 </div>
-                <span class="streak-flame" id="streakFlame" aria-hidden="true">ðŸ”¥</span>
+                <span class="streak-flame" id="streakFlame" aria-hidden="true">🔥</span>
               </div>
             </div>
             <div class="bar-block">
@@ -1419,7 +1419,7 @@
                 <div class="streak-track">
                   <div class="fpm-fill" id="fpmFill"></div>
                 </div>
-                <span class="fpm-runner" id="fpmRunner" aria-hidden="true">ðŸƒ</span>
+                <span class="fpm-runner" id="fpmRunner" aria-hidden="true">🏃</span>
               </div>
             </div>
           </div>
@@ -1462,7 +1462,7 @@
               <button type="button" class="key-btn" data-key="8">8</button>
               <button type="button" class="key-btn" data-key="9">9</button>
               <button type="button" class="key-btn wide" data-key="0">0</button>
-              <button type="button" class="key-btn" data-key="backspace">âŒ«</button>
+              <button type="button" class="key-btn" data-key="backspace">⌫</button>
             </div>
             <div class="row" style="margin-top:var(--space-3);justify-content:center;">
               <button type="button" class="btn" id="startBtn" disabled>Start Round</button>
@@ -1569,14 +1569,14 @@
     var SYNC_TOKEN_SESSION_KEY = 'factflow-google-token-session';
     var GOOGLE_USER_CACHE_KEY = 'factflow-google-user-cache';
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• CONFIG â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ CONFIG ═══════════════════════════
     var STORAGE_KEY         = 'factflow-progress-';  // localStorage key prefix
     var SETTINGS_KEY       = 'factflow-settings';    // persist teacher settings
     var THEME_PREF_KEY    = 'factflow-theme-pref'; // 'light', 'dark', or 'system'
     var HAPTICS_KEY       = 'factflow-haptics-enabled'; // mobile haptic preference
     var SIGNED_IN_WORKING_PROGRESS_KEY = 'factflow-current-session-progress';
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• CLASSROOM / SHARED DEVICE â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ CLASSROOM / SHARED DEVICE ═══════════════════════════
     var REQUIRE_SIGN_IN_TO_PRACTICE = true;
     var SHARED_DEVICE_MODE = true;
     var STARTING_TABLE = 2;   // First times table (default: 2)
@@ -1637,7 +1637,7 @@
       }
     };
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• STATE â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ STATE ═══════════════════════════
     var state = {
       settings: loadSettings()
     };
@@ -1712,7 +1712,7 @@
 
     var syncDebounceTimer = null;
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• SESSION MODE â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ SESSION MODE ═══════════════════════════
     var sessionMode = 'signed-out';
     // allowed values: 'signed-out', 'google'
 
@@ -1725,7 +1725,7 @@
       return isGooglePracticeSession();
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• DOM REFS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ DOM REFS ═══════════════════════════
     var el = {};
     function cacheDom() {
       el.graduateBanner = document.getElementById('graduateBanner');
@@ -1810,7 +1810,7 @@
       el.settingsConfirmResetCloudBtn = document.getElementById('settingsConfirmResetCloudBtn');
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• SETTINGS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ SETTINGS ═══════════════════════════
     function copySettings(source) {
       return {
         durationSec: source.durationSec,
@@ -1859,7 +1859,7 @@
       try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings)); } catch(e) {}
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• SYNC UTILITIES â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ SYNC UTILITIES ═══════════════════════════
     function cloneJson(obj) {
       if (!obj) return null;
       return JSON.parse(JSON.stringify(obj));
@@ -1972,7 +1972,7 @@
       return p;
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• WORKING PROGRESS (session-only for shared devices) â•â•â•
+    // ═══════════════════════════ WORKING PROGRESS (session-only for shared devices) ═══
     function getBlankWorkingProgress() {
       return blankProgress();
     }
@@ -2043,7 +2043,7 @@
       } catch (e) {}
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• PROGRESS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ PROGRESS ═══════════════════════════
     function getUserId() {
       return 'local-user';
     }
@@ -2556,7 +2556,7 @@
       if (shouldSyncCompletion) syncCompletionUi(p);
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• PRACTICE LOCK â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ PRACTICE LOCK ═══════════════════════════
     function setPracticeLocked(locked, message) {
       var text = message || '';
 
@@ -2598,7 +2598,7 @@
       }
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• SYNC STATUS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ SYNC STATUS ═══════════════════════════
     function getCachedGoogleUser() {
       var store;
       try {
@@ -2792,7 +2792,7 @@
       if (el.settingsSignOutBtn) el.settingsSignOutBtn.classList.toggle('hidden', !syncState.signedIn);
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• DRIVE FILE SHAPE â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ DRIVE FILE SHAPE ═══════════════════════════
     function wrapProgressForDrive(progress) {
       var stampMs = nowMs();
       return {
@@ -2815,7 +2815,7 @@
       return null;
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• GOOGLE AUTH â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ GOOGLE AUTH ═══════════════════════════
     function saveTokenSession(tokenResponse) {
       try {
         if (!tokenResponse || !tokenResponse.access_token) return;
@@ -2908,7 +2908,7 @@
           setSyncStatus('syncing', 'Restoring Google sync...');
           onGoogleSignedIn();
         } else {
-          // No valid token in sessionStorage â€” wait for manual sign-in.
+          // No valid token in sessionStorage — wait for manual sign-in.
           setSyncStatus('local', 'Sign in to sync');
         }
       }
@@ -3117,8 +3117,8 @@
         });
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• SIGN IN / OUT â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• HYDRATE PROGRESS AFTER SIGN-IN â•â•â•
+    // ═══════════════════════════ SIGN IN / OUT ═══════════════════════════
+    // ═══════════════════════════ HYDRATE PROGRESS AFTER SIGN-IN ═══
     function hydrateGoogleProgressAfterSignIn() {
       var cloudProgress;
       var cloudHash;
@@ -3310,7 +3310,7 @@
       setSyncStatus('local', 'Sign in to start');
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• DRIVE FETCH â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ DRIVE FETCH ═══════════════════════════
     function isAuthError(e) {
       return e && (e.status === 401 || e.message === 'TOKEN_EXPIRED' || e.message === 'NO_TOKEN');
     }
@@ -3370,15 +3370,15 @@
       options.headers = options.headers || {};
       options.headers.Authorization = 'Bearer ' + syncState.accessToken;
 
-      console.log('[FactFlow Sync] driveFetch', { method: options.method || 'GET', url: url.replace(/\?.*/, '?â€¦').substring(0, 80) });
+      console.log('[FactFlow Sync] driveFetch', { method: options.method || 'GET', url: url.replace(/\?.*/, '?…').substring(0, 80) });
 
       return fetch(url, options).then(function (r) {
-        console.log('[FactFlow Sync] Drive API response', { url: url.replace(/\?.*/, '?â€¦').substring(0, 80), status: r.status, ok: r.ok });
+        console.log('[FactFlow Sync] Drive API response', { url: url.replace(/\?.*/, '?…').substring(0, 80), status: r.status, ok: r.ok });
         return r;
       });
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• DRIVE FILE DISCOVERY â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ DRIVE FILE DISCOVERY ═══════════════════════════
     function findDriveFile(options) {
       options = options || {};
       if (syncState.driveFileId) return Promise.resolve(syncState.driveFileId);
@@ -3496,7 +3496,7 @@
       });
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• DRIVE UPLOAD / DOWNLOAD â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ DRIVE UPLOAD / DOWNLOAD ═══════════════════════════
     function downloadDriveProgress(fileId) {
       if (!fileId) return Promise.resolve(null);
 
@@ -3649,7 +3649,7 @@
         });
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• MERGE HELPERS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ MERGE HELPERS ═══════════════════════════
     function mergeProgress(localProgress, cloudProgress) {
       var local = normalizeProgressForSave(cloneJson(localProgress) || blankProgress());
       var cloud = normalizeProgressForSave(cloneJson(cloudProgress) || blankProgress());
@@ -4017,7 +4017,7 @@
       }, SYNC_CLOUD_DEBOUNCE_MS);
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• SYNC ORCHESTRATION â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ SYNC ORCHESTRATION ═══════════════════════════
     function syncNow(reason) {
       console.log('[FactFlow Sync] syncNow start', { reason: reason, signedIn: syncState.signedIn, online: navigator.onLine, isSyncing: syncState.isSyncing });
       if (reason === 'manual') clearSyncBlockState();
@@ -4227,7 +4227,7 @@
       }, immediate ? 0 : SYNC_SAVE_DEBOUNCE_MS);
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• SYNC POLLING â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ SYNC POLLING ═══════════════════════════
     function startSyncPolling() {
       stopSyncPolling();
       syncState.pollTimer = setInterval(function () {
@@ -4442,7 +4442,7 @@
       };
     }
 
-    // â•â•â• New mastery helpers (V2) â•â•â•
+    // ═══ New mastery helpers (V2) ═══
     function getRecentAttempts(s, count) {
       var recent = s && Array.isArray(s.recent) ? s.recent : [];
       return recent.slice(Math.max(0, recent.length - count));
@@ -4728,7 +4728,7 @@
       return clamp(Math.round(current), sessionFloor, 100);
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• CONFETTI â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ CONFETTI ═══════════════════════════
     function getPlayAreaConfettiOrigins() {
       var playRect;
       var problemRect;
@@ -4781,7 +4781,7 @@
       var endAt;
 
       if (hasLaunchedConfetti) {
-        console.log('[confetti] launchConfettiOnce skipped â€” already launched');
+        console.log('[confetti] launchConfettiOnce skipped — already launched');
         return;
       }
 
@@ -4861,7 +4861,7 @@
       hasLaunchedConfetti = false;
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• GRADUATION â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ GRADUATION ═══════════════════════════
     function getTableGraduationReadiness(progress) {
       var table = progress.currentTable;
       var a = getEffectiveAdaptive(state.settings.adaptive);
@@ -4955,7 +4955,7 @@
       return progress;
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• ADAPTIVE ENGINE â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ ADAPTIVE ENGINE ═══════════════════════════
     var ALL_SECONDS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
     function getActiveModel(progress) {
@@ -5279,7 +5279,7 @@
       return items[items.length - 1];
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• ROUND MANAGEMENT â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ ROUND MANAGEMENT ═══════════════════════════
     function showRoundStartCountdown(value, label) {
       if (el.roundCountdownValue) {
         el.roundCountdownValue.textContent = String(value);
@@ -5467,7 +5467,7 @@
       }
       round = null;
       if (el.newFactLabel) { el.newFactLabel.textContent = ''; el.newFactLabel.classList.remove('visible'); }
-      el.problemText.textContent = save ? "Timeâ€™s up!" : 'Ready?';
+      el.problemText.textContent = save ? "Time’s up!" : 'Ready?';
       var syncResult = syncCompletionUi(finalProgress, { celebrate: !finalCelebrationShown });
       console.log('[confetti] stopRound syncCompletionUi result: completed=' + syncResult + ' celebrate=' + !finalCelebrationShown + ' finalCelebrationShown=' + finalCelebrationShown);
       if (!syncResult) {
@@ -5819,7 +5819,7 @@
     }
 
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• MID-ROUND GRADUATION â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ══════════════════════ MID-ROUND GRADUATION ══════════════════════
     function checkMidRoundGraduation(progress) {
       var oldTable;
       var newTable;
@@ -5868,12 +5868,12 @@
         if (status === 'fluent' || status === 'review') masteredCount++;
       });
 
-      var msg = 'âœ… You mastered the Ã—' + oldTable + 's! (' + masteredCount + ' of 11 facts green) â†’ Now on Ã—' + newTable + '!';
+      var msg = '✅ You mastered the ×' + oldTable + 's! (' + masteredCount + ' of 11 facts green) → Now on ×' + newTable + '!';
       showLevelUpToast(msg);
       launchConfettiOnce();
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• KEYPAD â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ KEYPAD ═══════════════════════════
     var MAX_ANSWER_DIGITS = 3;
     var pendingAnswerCheckToken = 0;
     var pendingAnswerCheckFrame = null;
@@ -6083,7 +6083,7 @@
       return completed;
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• PROGRESS GRAPH â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ PROGRESS GRAPH ═══════════════════════════
     function isFactMastered(stats) {
       var status = stats ? getFactDisplayStatus(stats, state.settings.adaptive) : '';
       return status === 'fluent' || status === 'review';
@@ -6521,7 +6521,7 @@
     }
 
     // v28: makeTicks() removed (was unused dead code)
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• PROGRESS GRID â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ PROGRESS GRID ═══════════════════════════
     function renderProgressGrid(progress) {
       progress = progress || (round && round.progress) || loadProgress();
       var currentTable = progress.currentTable;
@@ -6579,11 +6579,11 @@
       el.progressGrid.innerHTML = html;
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• UI â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ UI ═══════════════════════════
     function updatePracticeHeader(progress) {
       progress = progress || (round && round.progress) || loadProgress();
       var model = getActiveModel(progress);
-      el.practiceTitle.textContent = 'Ã—' + progress.currentTable + ' Tables';
+      el.practiceTitle.textContent = '×' + progress.currentTable + ' Tables';
       el.practiceSubtitle.textContent = model.activeFacts.length + ' facts active through \u00d7' + model.maxSecond;
     }
 
@@ -6623,7 +6623,7 @@
       setRoundPill(round ? 'Running' : 'Ready');
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• HELPERS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ HELPERS ═══════════════════════════
     function resetProgress(options) {
       options = options || {};
       var deleteCloud = options.deleteCloud === true;
@@ -6718,23 +6718,6 @@
     }
 
     var FIXED_BAR_GRADIENT = 'linear-gradient(90deg, #2d8cff 0%, #f2d23b 35%, #f28c28 65%, #d72626 100%)';
-if (pct <= 50) {
-        var t = (pct - 25) / 25;
-        if (t < 0.04) return 'linear-gradient(90deg,' + C[0] + ',' + C[0] + ')';
-        var s = (t * 100).toFixed(0);
-        return 'linear-gradient(90deg,' + C[0] + ' 0%,' + C[1] + ' ' + s + '%,' + C[1] + ' 100%)';
-      }
-      if (pct <= 75) {
-        var t = (pct - 50) / 25;
-        if (t < 0.04) return 'linear-gradient(90deg,' + C[0] + ' 0%,' + C[1] + ' 50%,' + C[1] + ' 100%)';
-        var s = (50 + t * 50).toFixed(0);
-        return 'linear-gradient(90deg,' + C[0] + ' 0%,' + C[1] + ' 50%,' + C[2] + ' ' + s + '%,' + C[2] + ' 100%)';
-      }
-      var t = (pct - 75) / 25;
-      if (t < 0.04) return 'linear-gradient(90deg,' + C[0] + ' 0%,' + C[1] + ' 33%,' + C[2] + ' 66%,' + C[2] + ' 100%)';
-      var s = (66 + t * 34).toFixed(0);
-      return 'linear-gradient(90deg,' + C[0] + ' 0%,' + C[1] + ' 33%,' + C[2] + ' 66%,' + C[3] + ' ' + s + '%,' + C[3] + ' 100%)';
-    }
 
     function applyFixedBarGradient(fillEl, trackEl) {
       if (!fillEl || !trackEl) return;
@@ -6776,7 +6759,7 @@ if (pct <= 50) {
           startBtnCooldown = null;
           el.startBtn.disabled = false;
           el.startBtn.textContent = getPrimaryActionLabel(loadProgress());
-          if (el.problemText && el.problemText.textContent === "Timeâ€™s up!") {
+          if (el.problemText && el.problemText.textContent === "Time’s up!") {
             el.problemText.textContent = 'Ready?';
           }
         } else {
@@ -6810,7 +6793,7 @@ if (pct <= 50) {
     function hideGraduateBanner() { el.graduateBanner.classList.remove('active'); }
     function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• MOBILE HELPERS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ MOBILE HELPERS ═══════════════════════════
     function isProbablyMobile() {
       try {
         if (navigator.userAgentData && typeof navigator.userAgentData.mobile === 'boolean') {
@@ -6868,7 +6851,7 @@ if (pct <= 50) {
       document.body.classList.toggle('mobile-play-mode', isProbablyMobile() || window.innerWidth <= 500);
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• THEME â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ THEME ═══════════════════════════
     function getSystemTheme() {
       if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
       return 'light';
@@ -6993,7 +6976,7 @@ if (pct <= 50) {
     }
 
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• SCORE INFO PANEL â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ SCORE INFO PANEL ═══════════════════════════
     function openScoreInfo() {
       if (!el.scoreInfoOverlay) return;
       el.scoreInfoOverlay.classList.remove('hidden');
@@ -7014,7 +6997,7 @@ if (pct <= 50) {
       if (el.hapticsInfoOverlay) el.hapticsInfoOverlay.classList.add('hidden');
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• EVENTS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═══════════════════════════ EVENTS ═══════════════════════════
     function bindEvents() {
       if (el.themeLightBtn) {
         el.themeLightBtn.addEventListener('click', function () { setThemePref('light'); closeSettingsMenu(); });
@@ -7081,7 +7064,7 @@ if (pct <= 50) {
         });
       }
 
-      // â”€â”€ Settings menu â”€â”€
+      // ── Settings menu ──
       if (el.settingsBtn) {
         el.settingsBtn.addEventListener('click', function (e) {
           e.stopPropagation();
@@ -7239,7 +7222,7 @@ if (pct <= 50) {
       }, { passive: false });
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• INIT â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ═════════════════════════════════════════════════ INIT ═════════════════════════════════════════════════
 
     function init() {
       cacheDom();
