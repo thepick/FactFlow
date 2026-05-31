@@ -1559,15 +1559,18 @@
     // Sync timing.
     var SYNC_PULL_INTERVAL_MS = 60000;
     var SYNC_SAVE_DEBOUNCE_MS = 3000;
-    var SYNC_BEFORE_ROUND_MAX_AGE_MS = 10000;
+    var SYNC_BEFORE_ROUND_MAX_AGE_MS = 2 * 60 * 1000;
     var SYNC_CLOUD_DEBOUNCE_MS = 2500;
     var GOOGLE_AUTH_MAX_INIT_ATTEMPTS = 20;
+    var TOKEN_REFRESH_LEEWAY_MS = 5 * 60 * 1000;
+    var TOKEN_REFRESH_BEFORE_ROUND_MS = 7 * 60 * 1000;
 
     // Local sync metadata keys.
     var LOCAL_DEVICE_ID_KEY = 'factflow-device-id';
     var SYNC_ENABLED_KEY = 'factflow-sync-enabled-before';
     var SYNC_TOKEN_SESSION_KEY = 'factflow-google-token-session';
     var GOOGLE_USER_CACHE_KEY = 'factflow-google-user-cache';
+    var SYNC_INTENT_KEY = 'factflow_intent_to_sync';
 
     // ═══════════════════════════ CONFIG ═══════════════════════════
     var STORAGE_KEY         = 'factflow-progress-';  // localStorage key prefix
@@ -1707,7 +1710,8 @@
       needsSyncAfterCurrent: false,
       deferSyncUntilRoundEnds: false,
       permissionRetryAttempted: false,
-      tokenRefreshInFlight: false
+      tokenRefreshInFlight: false,
+      tokenRefreshTimer: null
     };
 
     var syncDebounceTimer = null;
@@ -1947,6 +1951,21 @@
       try {
         if (enabled) localStorage.setItem(SYNC_ENABLED_KEY, 'true');
         else localStorage.removeItem(SYNC_ENABLED_KEY);
+      } catch (e) {}
+    }
+
+    function hasPersistentSyncIntent() {
+      try {
+        return !SHARED_DEVICE_MODE && localStorage.getItem(SYNC_INTENT_KEY) === 'true';
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function setPersistentSyncIntent(enabled) {
+      try {
+        if (!enabled || SHARED_DEVICE_MODE) localStorage.removeItem(SYNC_INTENT_KEY);
+        else localStorage.setItem(SYNC_INTENT_KEY, 'true');
       } catch (e) {}
     }
 
@@ -2843,6 +2862,7 @@
         syncState.signedIn = true;
         syncState.googleUser = getCachedGoogleUser();
         syncState.lastError = null;
+        scheduleProactiveRefresh();
         return true;
       } catch (e) {
         return false;
@@ -2907,8 +2927,20 @@
         if (restoreTokenSession()) {
           setSyncStatus('syncing', 'Restoring Google sync...');
           onGoogleSignedIn();
+        } else if (hasPersistentSyncIntent()) {
+          setSyncStatus('syncing', 'Reconnecting Google sync...');
+          requestGoogleTokenRefresh('none')
+            .then(function () {
+              return onGoogleSignedIn();
+            })
+            .catch(function (e) {
+              if (window.console && console.warn) {
+                console.warn('Silent Google sync restore failed:', e);
+              }
+              setSyncStatus('local', 'Sign in to sync');
+            });
         } else {
-          // No valid token in sessionStorage — wait for manual sign-in.
+          // No valid token in sessionStorage - wait for manual sign-in.
           setSyncStatus('local', 'Sign in to sync');
         }
       }
@@ -2969,12 +3001,19 @@
 
       return new Promise(function (resolve, reject) {
         var oldCallback = syncState.tokenClient.callback;
+        var oldErrorCallback = syncState.tokenClient.error_callback;
         var finished = false;
+
+        function restoreTokenCallbacks() {
+          syncState.tokenRefreshInFlight = false;
+          syncState.tokenClient.callback = oldCallback;
+          syncState.tokenClient.error_callback = oldErrorCallback;
+        }
+
         var timeoutId = setTimeout(function () {
           if (finished) return;
           finished = true;
-          syncState.tokenRefreshInFlight = false;
-          syncState.tokenClient.callback = oldCallback;
+          restoreTokenCallbacks();
           reject(new Error('Token refresh timed out'));
         }, 15000);
 
@@ -2982,8 +3021,7 @@
           if (finished) return;
           finished = true;
           clearTimeout(timeoutId);
-          syncState.tokenRefreshInFlight = false;
-          syncState.tokenClient.callback = oldCallback;
+          restoreTokenCallbacks();
           if (!tokenResponse || tokenResponse.error) {
             reject(new Error(tokenResponse && tokenResponse.error ? tokenResponse.error : 'Token refresh failed'));
             return;
@@ -2995,18 +3033,87 @@
           applyTokenResponse(tokenResponse);
           resolve(tokenResponse);
         };
+
+        syncState.tokenClient.error_callback = function (e) {
+          if (finished) return;
+          finished = true;
+          clearTimeout(timeoutId);
+          restoreTokenCallbacks();
+          reject(e || new Error('Token refresh failed'));
+        };
+
         try {
           syncState.tokenClient.requestAccessToken({ prompt: typeof promptValue === 'string' ? promptValue : '' });
         } catch (e) {
           if (!finished) {
             finished = true;
             clearTimeout(timeoutId);
-            syncState.tokenRefreshInFlight = false;
-            syncState.tokenClient.callback = oldCallback;
+            restoreTokenCallbacks();
             reject(e);
           }
         }
       });
+    }
+
+    function clearProactiveRefreshTimer() {
+      if (syncState.tokenRefreshTimer) {
+        clearTimeout(syncState.tokenRefreshTimer);
+        syncState.tokenRefreshTimer = null;
+      }
+    }
+
+    function scheduleProactiveRefresh() {
+      var msUntilRefresh;
+
+      clearProactiveRefreshTimer();
+
+      if (!syncState.signedIn || !syncState.tokenClient || !syncState.tokenExpiresAt) return;
+
+      msUntilRefresh = syncState.tokenExpiresAt - nowMs() - TOKEN_REFRESH_LEEWAY_MS;
+      if (msUntilRefresh <= 0) return;
+
+      syncState.tokenRefreshTimer = setTimeout(function () {
+        syncState.tokenRefreshTimer = null;
+
+        if (!syncState.signedIn || !syncState.tokenClient || syncState.tokenRefreshInFlight) return;
+        if (!navigator.onLine) return;
+        if (document.visibilityState && document.visibilityState !== 'visible') return;
+
+        requestGoogleTokenRefresh('none').catch(function (e) {
+          if (window.console && console.warn) {
+            console.warn('Proactive token refresh failed:', e);
+          }
+        });
+      }, msUntilRefresh);
+    }
+
+    function ensureFreshGoogleToken(minRemainingMs, statusMessage) {
+      var msLeft;
+
+      if (!syncState.signedIn || !syncState.accessToken || !syncState.tokenClient) return Promise.resolve(false);
+      if (!navigator.onLine) return Promise.resolve(false);
+      if (syncState.tokenRefreshInFlight) return Promise.resolve(false);
+
+      msLeft = syncState.tokenExpiresAt - nowMs();
+      if (msLeft >= minRemainingMs) return Promise.resolve(false);
+
+      if (statusMessage) setSyncStatus('syncing', statusMessage);
+
+      return requestGoogleTokenRefresh('none')
+        .then(function () {
+          clearSyncBlockState();
+          return true;
+        })
+        .catch(function (e) {
+          if (window.console && console.warn) {
+            console.warn('Silent Google token refresh failed:', e);
+          }
+          return false;
+        });
+    }
+
+    function ensureFreshTokenBeforeRound() {
+      return ensureFreshGoogleToken(TOKEN_REFRESH_BEFORE_ROUND_MS, 'Refreshing Google sync...');
     }
 
     function handleTokenResponse(tokenResponse) {
@@ -3070,7 +3177,9 @@
       syncState.lastError = null;
       syncState.permissionBlocked = false;
       setSyncEnabledBefore(true);
+      setPersistentSyncIntent(true);
       saveTokenSession(tokenResponse);
+      scheduleProactiveRefresh();
       console.log('[FactFlow Sync] applyTokenResponse', {
         hasToken: !!syncState.accessToken,
         expiresAt: new Date(syncState.tokenExpiresAt).toISOString(),
@@ -3275,6 +3384,7 @@
       }
 
       stopSyncPolling();
+      clearProactiveRefreshTimer();
 
       syncState.pendingPush = false;
       syncState.signedIn = false;
@@ -3296,6 +3406,7 @@
       syncState.lastSyncedLocalSaveCounter = 0;
 
       setSyncEnabledBefore(false);
+      setPersistentSyncIntent(false);
       clearTokenSession();
 
       if (SHARED_DEVICE_MODE) {
@@ -4263,7 +4374,10 @@
         }
 
         if (document.visibilityState === 'visible' && syncState.signedIn && !round) {
-          syncNow('visible');
+          ensureFreshGoogleToken(TOKEN_REFRESH_BEFORE_ROUND_MS, 'Refreshing Google sync...')
+            .then(function () {
+              if (syncState.signedIn && !round) syncNow('visible');
+            });
         }
       });
 
@@ -5347,28 +5461,40 @@
         setSyncStatus('local', 'Sign in to start');
         return;
       }
-      if (syncState.signedIn && navigator.onLine && nowMs() - syncState.lastPullAt > SYNC_BEFORE_ROUND_MAX_AGE_MS) {
-        setStatus(el.roundStatus, 'Syncing progress before the round...', 'warn');
-        syncNow('before-round').then(function () {
-          if (!isPracticeAllowed()) {
-            setPracticeLocked(true, 'Sign in with Google to start.');
-            setSyncStatus('local', 'Sign in to start');
-            return;
-          }
-          startRoundNow();
-        }).catch(function (e) {
-          if (isAuthError(e) || e.message === 'TOKEN_EXPIRED') {
-            setSyncStatus('error', 'Sign in again to sync');
-            setPracticeLocked(true, 'Sign in with Google to start.');
-            return;
-          }
-          if (isPracticeAllowed()) {
+
+      ensureFreshTokenBeforeRound().then(function () {
+        if (!isPracticeAllowed()) {
+          setPracticeLocked(true, 'Sign in with Google to start.');
+          setSyncStatus('local', 'Sign in to start');
+          return;
+        }
+
+        if (syncState.signedIn && navigator.onLine && nowMs() - syncState.lastPullAt > SYNC_BEFORE_ROUND_MAX_AGE_MS) {
+          setStatus(el.roundStatus, 'Syncing progress before the round...', 'warn');
+          syncNow('before-round').then(function () {
+            if (!isPracticeAllowed()) {
+              setPracticeLocked(true, 'Sign in with Google to start.');
+              setSyncStatus('local', 'Sign in to start');
+              return;
+            }
             startRoundNow();
-          }
-        });
-        return;
-      }
-      startRoundNow();
+          }).catch(function (e) {
+            if (isAuthError(e) || e.message === 'TOKEN_EXPIRED') {
+              setSyncStatus('error', 'Sign in again to sync');
+              setPracticeLocked(true, 'Sign in with Google to start.');
+              return;
+            }
+            if (isPracticeAllowed()) {
+              startRoundNow();
+            }
+          });
+          return;
+        }
+
+        startRoundNow();
+      }).catch(function () {
+        if (isPracticeAllowed()) startRoundNow();
+      });
     }
 
     function startRoundNow() {
