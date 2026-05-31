@@ -5027,9 +5027,9 @@
       // Example: 6x7 followed by 6x7.
       if (candidate.displayKey && candidate.displayKey === previousProblem.displayKey) return true;
 
-      // Reversed facts are allowed back-to-back only while the fact is still yellow/learning.
-      // Example: 6x7 followed by 7x6 is allowed only when the candidate fact is learning.
-      if (candidate.familyKey && candidate.familyKey === previousProblem.familyKey && candidate.status !== 'learning') return true;
+      // Same fact-family repeats are never allowed back-to-back.
+      // This blocks both exact repeats and inverses, such as 6x7 followed by 7x6.
+      if (candidate.familyKey && candidate.familyKey === previousProblem.familyKey) return true;
 
       return false;
     }
