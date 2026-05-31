@@ -1650,6 +1650,8 @@
     var roundEndsAt = 0;
     var lastProblemKey = null;
     var lastProblemInfo = null;
+    var recentProblemFamilies = [];
+    var MIN_FAMILY_SPACING = 2;
     var timeoutTimer = null;
     var cooldownUntil = 0;
     var cooldownFactKey = null;  // Bug M1 fix: track which fact triggered the cooldown
@@ -5134,39 +5136,131 @@
       return smaller + 'x' + larger;
     }
 
+    function isExactPreviousDisplay(candidate, previousProblem) {
+      return !!(
+        candidate &&
+        previousProblem &&
+        candidate.displayKey &&
+        candidate.displayKey === previousProblem.displayKey
+      );
+    }
+
+    function isRecentProblemFamily(candidate, previousProblem, recentFamilies) {
+      var history = recentFamilies || recentProblemFamilies;
+
+      if (!candidate || !candidate.familyKey) return false;
+      if (previousProblem && candidate.familyKey === previousProblem.familyKey) return true;
+      return !!(history && history.indexOf(candidate.familyKey) !== -1);
+    }
+
     function shouldBlockImmediateProblem(candidate, previousProblem) {
       if (!candidate || !previousProblem) return false;
 
       // Exact repeats are never allowed back-to-back.
       // Example: 6x7 followed by 6x7.
-      if (candidate.displayKey && candidate.displayKey === previousProblem.displayKey) return true;
+      if (isExactPreviousDisplay(candidate, previousProblem)) return true;
 
-      // Same fact-family repeats are never allowed back-to-back.
+      // Same fact-family repeats are blocked when an alternative exists.
       // This blocks both exact repeats and inverses, such as 6x7 followed by 7x6.
       if (candidate.familyKey && candidate.familyKey === previousProblem.familyKey) return true;
 
       return false;
     }
 
-    function filterImmediateRepeatPool(pool, previousProblem) {
+    function shouldBlockRecentProblem(candidate, previousProblem, recentFamilies) {
+      if (!candidate) return false;
+      if (isExactPreviousDisplay(candidate, previousProblem)) return true;
+      if (isRecentProblemFamily(candidate, previousProblem, recentFamilies)) return true;
+      return false;
+    }
+
+    function filterImmediateRepeatPool(pool, previousProblem, recentFamilies) {
       var strictPool;
       var exactOnlyPool;
 
-      if (!previousProblem || !pool || !pool.length) return pool;
+      if (!pool || !pool.length) return [];
+      if (!previousProblem && (!recentFamilies || !recentFamilies.length)) return pool;
 
+      // First choice: avoid the exact previous display and the recent fact-family window.
       strictPool = pool.filter(function (item) {
-        return !shouldBlockImmediateProblem(item, previousProblem);
+        return !shouldBlockRecentProblem(item, previousProblem, recentFamilies);
       });
       if (strictPool.length) return strictPool;
 
-      // If a very small pool ever makes the spacing rule impossible, keep the exact-repeat
-      // rule as the last protection and allow only a reversed-order fallback.
+      // If a very small pool makes family spacing impossible, keep the hard rule:
+      // do not show the exact same display twice in a row.
       exactOnlyPool = pool.filter(function (item) {
-        return !item.displayKey || item.displayKey !== previousProblem.displayKey;
+        return !isExactPreviousDisplay(item, previousProblem);
       });
       if (exactOnlyPool.length) return exactOnlyPool;
 
-      return pool;
+      return [];
+    }
+
+    function cloneProblemWithFlippedDisplay(item, previousProblem) {
+      var flipped;
+      var key;
+
+      if (!item || !previousProblem) return item;
+      if (item.displayKey !== previousProblem.displayKey) return item;
+      if (item.left === item.right) return item;
+
+      flipped = {};
+      for (key in item) {
+        if (Object.prototype.hasOwnProperty.call(item, key)) {
+          flipped[key] = item[key];
+        }
+      }
+
+      flipped.left = item.right;
+      flipped.right = item.left;
+      flipped.displayKey = flipped.left + 'x' + flipped.right;
+      return flipped;
+    }
+
+    function buildSafeFallbackPool(allPool, previousProblem, recentFamilies) {
+      var strictPool;
+      var exactOnlyPool;
+      var flippedPool;
+
+      if (!allPool || !allPool.length) return [];
+
+      strictPool = filterImmediateRepeatPool(allPool, previousProblem, recentFamilies);
+      if (strictPool.length) return strictPool;
+
+      exactOnlyPool = allPool.filter(function (item) {
+        return !isExactPreviousDisplay(item, previousProblem);
+      });
+      if (exactOnlyPool.length) return exactOnlyPool;
+
+      // Emergency case: if the only available non-square fact was generated in the
+      // same orientation as the previous display, flip its visual order rather than
+      // showing the exact same string again.
+      flippedPool = allPool.map(function (item) {
+        return cloneProblemWithFlippedDisplay(item, previousProblem);
+      }).filter(function (item) {
+        return !isExactPreviousDisplay(item, previousProblem);
+      });
+      if (flippedPool.length) return flippedPool;
+
+      // If a table truly has only one square fact available, an exact repeat is
+      // mathematically unavoidable. This is the only place where it is allowed.
+      return allPool;
+    }
+
+    function rememberRecentProblemFamily(problem) {
+      if (!problem || !problem.familyKey) return;
+
+      recentProblemFamilies.push(problem.familyKey);
+      while (recentProblemFamilies.length > MIN_FAMILY_SPACING) {
+        recentProblemFamilies.shift();
+      }
+    }
+
+    function clearProblemHistory() {
+      lastProblemKey = null;
+      lastProblemInfo = null;
+      recentProblemFamilies = [];
     }
 
     function makeShuffledTableDeck() {
@@ -5211,8 +5305,8 @@
         pool.push(item);
       });
 
-      pool = filterImmediateRepeatPool(pool, previousProblem);
-      return pool.length ? pool : filterImmediateRepeatPool(fallbackPool, previousProblem);
+      pool = filterImmediateRepeatPool(pool, previousProblem, recentProblemFamilies);
+      return pool.length ? pool : buildSafeFallbackPool(fallbackPool, previousProblem, recentProblemFamilies);
     }
 
     function chooseLevel100ReviewProblem(previousProblem, progress) {
@@ -5295,9 +5389,9 @@
         });
       }
 
-      // Prevent immediate repeats.
-      // Exact repeats are always blocked. Reversed-order repeats are allowed only while learning.
-      var currentPool = filterImmediateRepeatPool(buildPool(model.activeFacts), previousProblem);
+      // Prevent repeats. Exact repeats are blocked whenever any alternative exists;
+      // recent same-family repeats are avoided when the active pool is large enough.
+      var currentPool = filterImmediateRepeatPool(buildPool(model.activeFacts), previousProblem, recentProblemFamilies);
 
       // Build review pool (mastered tables)
       var masteredTables = [];
@@ -5347,8 +5441,8 @@
         });
       });
 
-      catchUpPool = filterImmediateRepeatPool(catchUpPool, previousProblem);
-      reviewPool = filterImmediateRepeatPool(reviewPool, previousProblem);
+      catchUpPool = filterImmediateRepeatPool(catchUpPool, previousProblem, recentProblemFamilies);
+      reviewPool = filterImmediateRepeatPool(reviewPool, previousProblem, recentProblemFamilies);
 
       // Decide which pool to draw from. Catch-up fixes older progress where a past row
       // was advanced before every fact in that row had been answered.
@@ -5356,18 +5450,14 @@
       var useReview = !useCatchUp && reviewPool.length > 0 && Math.random() < reviewPct;
       var pool = useCatchUp ? catchUpPool : (useReview ? reviewPool : currentPool);
 
-      // If chosen pool is empty after filtering, fall back
+      // If chosen pool is empty after filtering, try other filtered pools first.
       if (!pool.length) pool = useCatchUp ? currentPool : (useReview ? currentPool : (catchUpPool.length ? catchUpPool : (reviewPool.length ? reviewPool : currentPool)));
       if (!pool.length) {
-        // Ultimate fallback
-        var sec = model.activeFacts[0] || 2;
-        var fac = model.table;
-        return {
-          problem: { table: fac, second: sec, left: fac, right: sec, answer: fac * sec, weight: 1, status: 'learning', familyKey: makeFactFamilyKey(fac, sec), displayKey: fac + 'x' + sec },
-          fromReview: false,
-          model: model
-        };
+        // Ultimate fallback: rebuild from all active facts, but still respect
+        // recent-family spacing and the no-exact-back-to-back rule when possible.
+        pool = buildSafeFallbackPool(buildPool(model.activeFacts), previousProblem, recentProblemFamilies);
       }
+      if (!pool.length) return null;
 
       var chosen = weightedPick(pool);
       return {
@@ -5533,8 +5623,8 @@
         progressDirty: false,
         startProgressSnapshot: cloneJson(progress) || null
       };
-      lastProblemKey = null;
-      lastProblemInfo = null;
+      // Keep problem history across round starts so the first fact of a new round
+      // cannot repeat the final fact from the previous round.
       clearTimeout(timeoutTimer);
       cooldownUntil = 0;
       wrongBurstCount = 0;
@@ -5640,6 +5730,12 @@
       wrongBurstStart = 0;
 
       var selection = chooseNextProblem(lastProblemInfo, progress);
+      if (!selection || !selection.problem) {
+        console.error('[FactFlow] Unable to choose next problem.');
+        stopRound(true);
+        return;
+      }
+
       var p = selection.problem;
       round.currentProblem = p;
       round.problemStartTime = Date.now();
@@ -5650,6 +5746,7 @@
         familyKey: p.familyKey,
         status: p.status || ''
       };
+      rememberRecentProblemFamily(p);
 
       var isNewFactIntro = isNewFactIntroductionDue(progress, round.currentProblem.table, round.currentProblem.second);
       round.currentProblem.introMasteryFree = isNewFactIntro;
@@ -6761,6 +6858,7 @@
       finalCelebrationShown = false;
       hideCompletionCelebration();
       clearProgressMemory();
+      clearProblemHistory();
 
       if (SHARED_DEVICE_MODE) {
         clearWorkingProgress();
