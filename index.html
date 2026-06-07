@@ -124,6 +124,36 @@
     .status-text.good { background: var(--color-success-highlight); color: var(--color-text); }
     .status-text.warn { background: var(--color-gold-highlight); color: var(--color-text); }
     .status-text.bad { background: var(--color-error-highlight); color: var(--color-text); }
+    .classroom-submit-box {
+      display: grid;
+      gap: 0.35rem;
+      justify-items: center;
+      margin-top: var(--space-2);
+      padding: 0.55rem 0.7rem;
+      border: 1px solid color-mix(in srgb, var(--color-primary) 18%, transparent);
+      background: color-mix(in srgb, var(--color-primary-highlight) 62%, var(--color-surface));
+      border-radius: var(--radius-md);
+      color: var(--color-text-muted);
+      font-size: var(--text-xs);
+      text-align: center;
+    }
+    .classroom-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-weight: 800;
+      color: var(--color-text);
+      line-height: 1.25;
+    }
+    .classroom-submit-status { line-height: 1.3; }
+    .classroom-submit-status.ok { color: var(--color-success); font-weight: 700; }
+    .classroom-submit-status.error { color: var(--color-error); font-weight: 700; }
+    .classroom-retry-btn {
+      min-height: 0;
+      padding: 0.3rem 0.6rem;
+      font-size: var(--text-xs);
+      border-radius: var(--radius-full);
+    }
     .pill { display: inline-flex; padding: 0.25rem 0.55rem; border-radius: var(--radius-full); background: var(--color-surface-offset); font-size: var(--text-xs); font-weight: 600; }
     .timeout-overlay { display: none; text-align: center; padding: var(--space-4); background: var(--color-gold-highlight); border-radius: var(--radius-lg); border: 2px solid var(--color-gold); margin-top: var(--space-3); }
     .timeout-overlay.active { display: block; }
@@ -1468,6 +1498,11 @@
               <button type="button" class="btn" id="startBtn" disabled>Start Round</button>
             </div>
             <div class="status-text" id="roundStatus">Press Start when ready.</div>
+            <div class="classroom-submit-box hidden" id="classroomSubmitBox" aria-live="polite">
+              <div class="classroom-badge" id="classroomBadge"></div>
+              <div class="classroom-submit-status" id="classroomSubmitStatus"></div>
+              <button type="button" class="btn-ghost classroom-retry-btn hidden" id="classroomRetryBtn">Send again</button>
+            </div>
             <div class="score-note" id="scoreNote"></div>
           </div>
         </div>
@@ -1640,9 +1675,41 @@
       }
     };
 
+    // ═══════════════════════════ CLASSROOM SUBMISSION ═══════════════════════════
+    // Normal factflow.mtomlinson.ca use stays personal-practice only.
+    // Classroom submission is enabled only by a valid ?t= key below.
+    // Apps Script URLs are filled from the existing FactFlow Check class routes.
+    // IMPORTANT: before practice submissions will work, those Apps Script projects
+    // must be updated to the combined receiver in factflow-practice-apps-script.gs.
+    var CLASSROOM_SUBMIT_VERSION = 'factflow-practice-submit-v1';
+    var TEACHERS = {
+      'IP5/9': {
+        name: 'Ajarn Michael - IP5/9',
+        url: 'https://script.google.com/macros/s/AKfycbyuE5nR4e0d-qS5xvsoK_DdyUwUlBt-0uCBbG2KgNnhnF63B-B4g-DI819f5MfwDR93Bg/exec'
+      },
+      'IP5/8': {
+        name: 'Ajarn Jordan - IP5/8',
+        url: 'https://script.google.com/macros/s/AKfycbz1DSGVUh2rCaQBRAnf9SuXiF3Ki6tEXKSRNsoiKt-v8z8-UIMARxclA-YjCaU2fQO2OA/exec'
+      }
+    };
+
     // ═══════════════════════════ STATE ═══════════════════════════
     var state = {
       settings: loadSettings()
+    };
+
+    var classroomState = {
+      enabled: false,
+      teacherKey: '',
+      teacherName: '',
+      submitUrl: '',
+      lastRoundId: '',
+      lastPayload: null,
+      lastSubmitOk: false,
+      lastSubmitError: '',
+      statusMode: '',
+      receiverChecked: false,
+      receiverReady: false
     };
 
     var round = null;
@@ -1784,6 +1851,10 @@
       el.feedbackPill = document.getElementById('feedbackPill');
       el.startBtn = document.getElementById('startBtn');
       el.roundStatus = document.getElementById('roundStatus');
+      el.classroomSubmitBox = document.getElementById('classroomSubmitBox');
+      el.classroomBadge = document.getElementById('classroomBadge');
+      el.classroomSubmitStatus = document.getElementById('classroomSubmitStatus');
+      el.classroomRetryBtn = document.getElementById('classroomRetryBtn');
       el.scoreNote = document.getElementById('scoreNote');
       el.timeoutOverlay = document.getElementById('timeoutOverlay');
       el.timeoutAnswer = document.getElementById('timeoutAnswer');
@@ -1877,6 +1948,139 @@
 
     function nowMs() {
       return Date.now();
+    }
+
+    function normalizeNameForClassroom(name) {
+      return String(name || '').trim().replace(/\s+/g, ' ').split(' ').map(function (word) {
+        return word ? word.charAt(0).toUpperCase() + word.slice(1).toLowerCase() : '';
+      }).join(' ');
+    }
+
+    function initClassroomMode() {
+      var params;
+      var key;
+      var teacher;
+
+      classroomState.enabled = false;
+      classroomState.teacherKey = '';
+      classroomState.teacherName = '';
+      classroomState.submitUrl = '';
+
+      try {
+        params = new URLSearchParams(window.location.search || '');
+        key = params.get('t');
+      } catch (e) {
+        key = '';
+      }
+
+      if (key && TEACHERS[key]) {
+        teacher = TEACHERS[key];
+        classroomState.enabled = true;
+        classroomState.teacherKey = key;
+        classroomState.teacherName = teacher.name || key;
+        classroomState.submitUrl = teacher.url || '';
+      } else if (key && window.console && console.warn) {
+        console.warn('FactFlow classroom mode ignored invalid teacher key:', key);
+      }
+    }
+
+    function isClassroomSubmitUrlConfigured() {
+      return !!(classroomState.submitUrl && /^https:\/\/script\.google\.com\/macros\/s\//.test(classroomState.submitUrl));
+    }
+
+    function getRealGoogleUser() {
+      var user = null;
+      var name = '';
+      var email = '';
+
+      if (syncState && syncState.googleUser) user = syncState.googleUser;
+      if (!user) user = getCachedGoogleUser();
+      if (!user) return null;
+
+      name = String(user.name || '').trim();
+      email = String(user.email || '').trim();
+
+      if (name === 'Loading account...' || name === 'Google sync connected' || name === 'Connected') {
+        name = '';
+      }
+
+      if (!name && !email) return null;
+
+      return {
+        name: name || email || 'Unknown',
+        email: email
+      };
+    }
+
+    function getStudentKeyForClassroom(user) {
+      if (user && user.email) return String(user.email).trim().toLowerCase();
+      return normalizeNameForClassroom(user && user.name ? user.name : 'Unknown').toLowerCase();
+    }
+
+    function canSubmitClassroomRound() {
+      return !!(classroomState.enabled && isClassroomSubmitUrlConfigured() && getRealGoogleUser());
+    }
+
+    function updateClassroomSubmitUi(mode, message) {
+      var user;
+      var statusClass = 'classroom-submit-status';
+      var text = '';
+
+      if (!el.classroomSubmitBox || !el.classroomBadge || !el.classroomSubmitStatus) return;
+
+      if (!classroomState.enabled) {
+        el.classroomSubmitBox.classList.add('hidden');
+        if (el.classroomRetryBtn) el.classroomRetryBtn.classList.add('hidden');
+        return;
+      }
+
+      if (mode) classroomState.statusMode = mode;
+      user = getRealGoogleUser();
+
+      el.classroomSubmitBox.classList.remove('hidden');
+      el.classroomBadge.textContent = 'Classroom mode: ' + classroomState.teacherName;
+
+      if (!isClassroomSubmitUrlConfigured()) {
+        text = 'Practice receiver URL not configured yet.';
+        statusClass += ' error';
+        if (el.classroomRetryBtn) el.classroomRetryBtn.classList.add('hidden');
+      } else if (!user) {
+        text = 'Sign in with Google to send class progress.';
+        if (el.classroomRetryBtn) el.classroomRetryBtn.classList.add('hidden');
+      } else if (classroomState.statusMode === 'sending') {
+        text = 'Sending class progress...';
+        if (el.classroomRetryBtn) el.classroomRetryBtn.classList.add('hidden');
+      } else if (classroomState.statusMode === 'ok') {
+        text = message || 'Class progress sent.';
+        statusClass += ' ok';
+        if (el.classroomRetryBtn) el.classroomRetryBtn.classList.add('hidden');
+      } else if (classroomState.statusMode === 'error') {
+        text = message || 'Send failed. Try again.';
+        statusClass += ' error';
+        if (el.classroomRetryBtn) el.classroomRetryBtn.classList.remove('hidden');
+      } else {
+        text = 'Class progress will send after each completed round.';
+        if (el.classroomRetryBtn) el.classroomRetryBtn.classList.add('hidden');
+      }
+
+      el.classroomSubmitStatus.className = statusClass;
+      el.classroomSubmitStatus.textContent = text;
+    }
+
+    function attachClassroomIdentity(payload) {
+      var user = getRealGoogleUser();
+      if (!payload || !user) return false;
+      payload.studentName = user.name;
+      payload.studentEmail = user.email;
+      payload.studentKey = getStudentKeyForClassroom(user);
+      return true;
+    }
+
+    function trySubmitPendingClassroomPayload() {
+      if (!classroomState.enabled || !classroomState.lastPayload || classroomState.lastSubmitOk) return;
+      if (classroomState.statusMode !== 'waiting') return;
+      if (canSubmitClassroomRound()) sendClassroomRound(classroomState.lastPayload);
+      else updateClassroomSubmitUi();
     }
 
     function getValidSpeedTargetFpm(value) {
@@ -2811,6 +3015,7 @@
       if (el.headerGoogleUserInfo) el.headerGoogleUserInfo.title = status === 'error' ? getSyncErrorDetail(syncState.lastError) : text;
       if (el.settingsSyncStatusText) el.settingsSyncStatusText.textContent = status === 'error' ? getSyncErrorDetail(syncState.lastError) : text;
       if (el.settingsSignOutBtn) el.settingsSignOutBtn.classList.toggle('hidden', !syncState.signedIn);
+      updateClassroomSubmitUi();
     }
 
     // ═══════════════════════════ DRIVE FILE SHAPE ═══════════════════════════
@@ -3218,12 +3423,15 @@
           syncState.googleUser = info;
           cacheGoogleUser(info);
           refreshGoogleAuthHeader();
+          updateClassroomSubmitUi();
+          trySubmitPendingClassroomPayload();
           return info;
         })
         .catch(function (e) {
           syncState.lastError = e;
           if (!syncState.googleUser) syncState.googleUser = getCachedGoogleUser() || { name: 'Google sync connected' };
           refreshGoogleAuthHeader();
+          updateClassroomSubmitUi();
           return null;
         });
     }
@@ -3328,6 +3536,8 @@
           .then(function () {
             startSyncPolling();
             setSyncStatus('synced', 'Synced');
+            updateClassroomSubmitUi();
+            trySubmitPendingClassroomPayload();
           })
           .catch(function (e) {
             syncState.lastError = e;
@@ -3342,6 +3552,8 @@
                 .then(function () {
                   startSyncPolling();
                   setSyncStatus('synced', 'Synced');
+                  updateClassroomSubmitUi();
+                  trySubmitPendingClassroomPayload();
                 })
                 .catch(function (retryError) {
                   syncState.lastError = retryError;
@@ -3362,6 +3574,8 @@
         .then(function () {
           startSyncPolling();
           setSyncStatus('synced', 'Synced');
+          updateClassroomSubmitUi();
+          trySubmitPendingClassroomPayload();
         })
         .catch(function (e2) {
           syncState.lastError = e2;
@@ -3371,7 +3585,7 @@
 
     function signOutOfSync() {
       if (round) {
-        stopRound(false);
+        stopRound(false, 'sign-out');
       }
       flushProgressNow({ reason: 'before-sign-out' });
 
@@ -3394,6 +3608,11 @@
       syncState.tokenExpiresAt = 0;
       syncState.googleUser = null;
       clearCachedGoogleUser();
+      classroomState.lastPayload = null;
+      classroomState.lastSubmitOk = false;
+      classroomState.lastSubmitError = '';
+      classroomState.statusMode = '';
+      updateClassroomSubmitUi();
       syncState.driveFileId = null;
       syncState.driveModifiedTime = null;
       syncState.isSyncing = false;
@@ -5602,7 +5821,7 @@
         setSyncStatus('local', 'Sign in to start');
         return;
       }
-      stopRound(false);
+      stopRound(false, 'new-round');
       hideCompletionCelebration();
       stopConfetti();
       resetConfetti();
@@ -5655,11 +5874,13 @@
       roundTimer = setInterval(updateTimer, 200);
     }
 
-    function stopRound(save) {
+    function stopRound(save, reason) {
+      reason = reason || (save ? 'time-up' : 'cancelled');
       clearRoundStartCountdown();
       clearPendingAnswerCheck();
       var finalFpm = (save && round) ? getRoundFpm(round) : 0;
       var finalProgress = null;
+      var classroomSnapshot = null;
       document.body.classList.remove('round-active');
       if (el.mobileCornerTimer) { el.mobileCornerTimer.classList.remove('danger', 'warn'); el.mobileCornerTimer.textContent = ''; }
       clearInterval(roundTimer); roundTimer = null;
@@ -5672,6 +5893,11 @@
       updateStreakMeter(0);
       if (save && round) {
         finalProgress = finalizeRound();
+        classroomSnapshot = makeClassroomRoundSnapshot(round, finalProgress, {
+          endedAt: Date.now(),
+          stopReason: reason,
+          completedFully: reason === 'time-up'
+        });
         buzz(80);
         updateSpeedUi(finalFpm);
         beginStartCooldown();
@@ -5682,6 +5908,9 @@
         el.startBtn.textContent = getPrimaryActionLabel(loadProgress());
       }
       round = null;
+      if (classroomSnapshot && finalProgress) {
+        recordAndSubmitCompletedRound(classroomSnapshot, finalProgress);
+      }
       if (el.newFactLabel) { el.newFactLabel.textContent = ''; el.newFactLabel.classList.remove('visible'); }
       el.problemText.textContent = save ? "Time’s up!" : 'Ready?';
       var syncResult = syncCompletionUi(finalProgress, { celebrate: !finalCelebrationShown });
@@ -5717,7 +5946,7 @@
         el.mobileCornerTimer.classList.toggle('danger', isDanger);
         el.mobileCornerTimer.classList.toggle('warn', isWarn && !isDanger);
       }
-      if (left <= 0) stopRound(true);
+      if (left <= 0) stopRound(true, 'time-up');
     }
 
     function nextProblem(progress) {
@@ -5732,7 +5961,7 @@
       var selection = chooseNextProblem(lastProblemInfo, progress);
       if (!selection || !selection.problem) {
         console.error('[FactFlow] Unable to choose next problem.');
-        stopRound(true);
+        stopRound(true, 'no-problem');
         return;
       }
 
@@ -6341,6 +6570,209 @@
       };
     }
 
+    function makeClassroomRoundSnapshot(r, progress, options) {
+      var endedAt;
+      var elapsedSec;
+      var roundId;
+
+      options = options || {};
+      endedAt = options.endedAt || Date.now();
+      elapsedSec = Math.max(1, Math.round((endedAt - (r && r.startedAt ? r.startedAt : endedAt)) / 1000));
+      roundId = [
+        'ff',
+        classroomState.teacherKey || 'class',
+        r && r.startedAt ? r.startedAt : endedAt,
+        r && r.focusTable != null ? r.focusTable : 'unknown',
+        makeRandomSuffix().slice(0, 6)
+      ].join('-');
+
+      return {
+        roundId: roundId,
+        startedAtMs: r && r.startedAt ? r.startedAt : endedAt,
+        endedAtMs: endedAt,
+        roundStartedAt: r && r.startedAt ? new Date(r.startedAt).toISOString() : '',
+        roundEndedAt: new Date(endedAt).toISOString(),
+        elapsedSec: elapsedSec,
+        configuredDurationSec: r && r.durationSec != null ? r.durationSec : state.settings.durationSec,
+        completedFully: options.completedFully === true,
+        stopReason: options.stopReason || '',
+        focusTable: r && r.focusTable != null ? r.focusTable : '',
+        orderMode: r && r.orderMode ? r.orderMode : '',
+        attempted: r && r.attempted != null ? r.attempted : 0,
+        correct: r && r.correct != null ? r.correct : 0,
+        streak: r && r.streak != null ? r.streak : 0,
+        bestStreak: r && r.bestStreak != null ? r.bestStreak : 0,
+        timeoutsTriggered: r && r.timeoutsTriggered != null ? r.timeoutsTriggered : 0,
+        graduated: !!(r && r.graduated),
+        graduatedFrom: r && r.focusTable != null ? r.focusTable : '',
+        graduatedTo: r && r.graduated && progress && progress.currentTable != null ? progress.currentTable : ''
+      };
+    }
+
+    function buildClassroomRoundPayload(snapshot, progress) {
+      var attempted;
+      var correct;
+      var elapsedSec;
+      var accuracy;
+      var fpm;
+      var breakdown;
+      var payload;
+
+      progress = progress || loadProgress();
+      snapshot = snapshot || {};
+      attempted = Number(snapshot.attempted || 0);
+      correct = Number(snapshot.correct || 0);
+      elapsedSec = Math.max(1, Number(snapshot.elapsedSec || snapshot.configuredDurationSec || 60));
+      accuracy = attempted > 0 ? Math.round((correct / attempted) * 100) : 0;
+      fpm = Math.round(((correct / elapsedSec) * 60) * 10) / 10;
+      breakdown = getMasteryBreakdown(progress);
+
+      payload = {
+        app: 'FactFlowPractice',
+        schemaVersion: 1,
+        submitVersion: CLASSROOM_SUBMIT_VERSION,
+        teacherKey: classroomState.teacherKey,
+        teacherName: classroomState.teacherName,
+        roundId: snapshot.roundId,
+        submittedAt: new Date().toISOString(),
+        deviceId: syncState.deviceId || getDeviceId(),
+        studentName: '',
+        studentEmail: '',
+        studentKey: '',
+        roundStartedAt: snapshot.roundStartedAt,
+        roundEndedAt: snapshot.roundEndedAt,
+        focusTable: snapshot.focusTable,
+        orderMode: snapshot.orderMode,
+        configuredDurationSec: Number(snapshot.configuredDurationSec || 0),
+        elapsedSec: elapsedSec,
+        completedFully: snapshot.completedFully === true,
+        stopReason: snapshot.stopReason || '',
+        attempted: attempted,
+        correct: correct,
+        incorrect: Math.max(0, attempted - correct),
+        accuracy: accuracy,
+        fpm: fpm,
+        streak: Number(snapshot.streak || 0),
+        bestStreak: Number(snapshot.bestStreak || 0),
+        timeoutsTriggered: Number(snapshot.timeoutsTriggered || 0),
+        graduated: snapshot.graduated === true,
+        graduatedFrom: snapshot.graduatedFrom,
+        graduatedTo: snapshot.graduatedTo,
+        currentTable: progress && progress.currentTable != null ? progress.currentTable : '',
+        sessionsCompleted: Number(progress && progress.sessionsCompleted || 0),
+        allTimeBestStreak: Number(progress && progress.allTimeBestStreak || 0),
+        allTimeBestFpm: Number(progress && progress.allTimeBestFpm || 0),
+        fluentFacts: Number(breakdown.fluent || 0),
+        learningFacts: Number(breakdown.inProgress || 0),
+        strugglingFacts: Number(breakdown.struggling || 0),
+        totalFacts: Number(breakdown.total || MASTERY_TOTAL_FACTS)
+      };
+
+      attachClassroomIdentity(payload);
+      return payload;
+    }
+
+    function recordAndSubmitCompletedRound(snapshot, progress) {
+      var payload;
+
+      if (!classroomState.enabled || !snapshot || !progress) return;
+      if (snapshot.roundId && classroomState.lastRoundId === snapshot.roundId) return;
+
+      payload = buildClassroomRoundPayload(snapshot, progress);
+      classroomState.lastRoundId = snapshot.roundId;
+      classroomState.lastPayload = payload;
+      classroomState.lastSubmitOk = false;
+      classroomState.lastSubmitError = '';
+
+      if (canSubmitClassroomRound()) {
+        sendClassroomRound(payload);
+      } else {
+        classroomState.statusMode = 'waiting';
+        updateClassroomSubmitUi('waiting');
+      }
+    }
+
+    function verifyClassroomPracticeReceiver() {
+      var url;
+      if (!classroomState.enabled || !classroomState.submitUrl) {
+        return Promise.resolve(false);
+      }
+      if (classroomState.receiverChecked) {
+        return Promise.resolve(!!classroomState.receiverReady);
+      }
+
+      url = classroomState.submitUrl;
+      url += (url.indexOf('?') >= 0 ? '&' : '?') + 'check=practice-receiver&ts=' + encodeURIComponent(String(Date.now()));
+
+      return fetch(url, { method: 'GET' }).then(function (resp) {
+        return resp.text();
+      }).then(function (txt) {
+        var data = null;
+        try { data = JSON.parse(txt); } catch (e) { data = null; }
+        classroomState.receiverChecked = true;
+        classroomState.receiverReady = !!(data && data.ok && data.receiver === 'factflow-combined-v1');
+        return classroomState.receiverReady;
+      }).catch(function () {
+        classroomState.receiverChecked = true;
+        classroomState.receiverReady = false;
+        return false;
+      });
+    }
+
+    function postClassroomRound(payload) {
+      fetch(classroomState.submitUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(payload)
+      }).then(function (resp) {
+        return resp.text();
+      }).then(function (txt) {
+        var data = null;
+        try { data = JSON.parse(txt); } catch (e) { data = null; }
+        if (data && data.ok && data.receiver === 'factflow-practice-v1') {
+          classroomState.lastSubmitOk = true;
+          classroomState.lastSubmitError = '';
+          updateClassroomSubmitUi('ok');
+        } else {
+          classroomState.lastSubmitOk = false;
+          classroomState.lastSubmitError = data && data.error ? data.error : 'Practice receiver did not confirm the submission.';
+          updateClassroomSubmitUi('error', 'Send failed. Try again.');
+        }
+      }).catch(function (e) {
+        classroomState.lastSubmitOk = false;
+        classroomState.lastSubmitError = e && e.message ? e.message : 'Network error';
+        updateClassroomSubmitUi('error', 'Send failed. Try again.');
+      });
+    }
+
+    function sendClassroomRound(payload) {
+      if (!payload || !classroomState.enabled) return;
+      if (!canSubmitClassroomRound()) {
+        classroomState.statusMode = 'waiting';
+        updateClassroomSubmitUi('waiting');
+        return;
+      }
+
+      attachClassroomIdentity(payload);
+      payload.submittedAt = new Date().toISOString();
+      updateClassroomSubmitUi('sending');
+
+      verifyClassroomPracticeReceiver().then(function (ready) {
+        if (!ready) {
+          classroomState.lastSubmitOk = false;
+          classroomState.lastSubmitError = 'The Apps Script receiver has not been updated for FactFlow practice submissions.';
+          updateClassroomSubmitUi('error', 'Receiver needs updating. Practice was not sent.');
+          return;
+        }
+        postClassroomRound(payload);
+      });
+    }
+
+    function retryLastClassroomSubmit() {
+      if (!classroomState.lastPayload) return;
+      sendClassroomRound(classroomState.lastPayload);
+    }
+
     function getLevelsPassed(progress) {
       return getMasteryBreakdown(progress).fluent;
     }
@@ -6839,6 +7271,7 @@
       } else {
         setPracticeLocked(false);
       }
+      updateClassroomSubmitUi();
     }
 
     function renderPracticeView() {
@@ -6851,7 +7284,7 @@
       options = options || {};
       var deleteCloud = options.deleteCloud === true;
 
-      stopRound(false);
+      stopRound(false, 'reset');
       flushProgressNow({ reason: 'before-reset-progress' });
       stopConfetti();
       resetConfetti();
@@ -7355,6 +7788,9 @@
           closeSettingsMenu();
         });
       }
+      if (el.classroomRetryBtn) {
+        el.classroomRetryBtn.addEventListener('click', retryLastClassroomSubmit);
+      }
       el.startBtn.addEventListener('click', startRound);
       el.answerInput.addEventListener('input', queueAnswerInputCheck);
       el.timeoutInput.addEventListener('input', handleTimeoutInput);
@@ -7450,6 +7886,7 @@
 
     function init() {
       cacheDom();
+      initClassroomMode();
       initTheme();
       updateHapticsMenuText();
       syncSpeedTargetSlider();

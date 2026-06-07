@@ -1,4 +1,4 @@
-﻿# FactFlow
+# FactFlow
 
 FactFlow is a multiplication fluency web app designed for student practice. It helps learners build speed, accuracy, and confidence with multiplication facts through short timed rounds, adaptive review, and clear progress tracking.
 
@@ -8,7 +8,7 @@ FactFlow gives students focused multiplication practice while tracking how they 
 
 Students sign in with Google before practicing. Progress is synced through Google Drive app data storage, so students can continue their practice across supported devices when signed in with the same Google account.
 
-FactFlow does not require Firebase, a separate database, or a custom backend.
+FactFlow does not require Firebase or a separate database for normal personal practice. Classroom submission mode uses Google Apps Script only when the app is opened with a valid class link.
 
 ## Key features
 
@@ -24,7 +24,9 @@ FactFlow does not require Firebase, a separate database, or a custom backend.
 - Adjustable speed target: 20, 30, 40, 50, or 60 facts/min
 - Light mode, dark mode, and match-device appearance options
 - Optional mobile haptic feedback on supported devices
-- Google Drive app data sync without Firebase, a database, or a custom backend
+- Google Drive app data sync without Firebase or a database
+- Optional classroom submission mode using valid class links such as `?t=IP5/8` or `?t=IP5/9`
+- Automatic per-round classroom progress submission to a teacher Google Sheet when classroom mode is active
 - Sync status shown in the app header
 - Sync now, sign-out, and reset-progress options
 - Confetti and a level-up message when students move to a new times table
@@ -45,6 +47,37 @@ Sync is designed for classroom use:
 - If sync is interrupted, the app can continue using locally cached progress during the active signed-in session.
 - Sync can resume when the connection and Google session are available again.
 
+## Classroom submission mode
+
+FactFlow can also run in an optional classroom submission mode. This is separate from normal personal practice.
+
+URL behavior:
+
+| URL | Behavior |
+|---|---|
+| `https://factflow.mtomlinson.ca` | Personal practice only. No classroom submission UI and no teacher sheet submission. |
+| `https://factflow.mtomlinson.ca?t=IP5/8` | Classroom mode for IP5/8. |
+| `https://factflow.mtomlinson.ca?t=IP5/9` | Classroom mode for IP5/9. |
+| Any invalid `?t=` value | Fails closed. No classroom submission is enabled. |
+
+When classroom mode is active, the app shows a small classroom status message in the practice area. After each completed practice round, FactFlow automatically sends one round summary to the class Google Sheet. Students do not need to press a submit button.
+
+Classroom submission requires a real Google signed-in user. The app will not submit placeholder account text such as `Loading account...`. If the student is not signed in or the receiver is not ready, practice can continue but classroom submission is held or marked as failed.
+
+Each classroom submission includes the student's Google display name, email, class key, round ID, round timing, configured round duration, actual elapsed time, stop reason, attempted/correct/incorrect counts, accuracy, facts per minute, best streak, timeout count, graduation information, current table, and overall mastery breakdown.
+
+The Google Sheet receiver creates separate practice tabs:
+
+- `Practice Raw Data`: one row per completed practice round
+- `FactFlow Practice`: one row per student, updated after each submitted practice round
+
+The included Apps Script receiver also preserves the existing FactFlow Check tabs and behavior:
+
+- `Raw Data`
+- `Check`
+
+See `CLASSROOM-SUBMISSION-SETUP.md` for the full setup checklist.
+
 ## Designed for students
 
 The interface is simple and classroom-friendly. Students can start a round, answer using the on-screen keypad, and see immediate feedback.
@@ -63,11 +96,13 @@ The progress graph shows growth over time using saved quiz results. Started fact
 
 FactFlow requires students to sign in with Google before practicing.
 
-Progress is stored for the signed-in Google user and synced through the student's Google Drive app data folder. The sync file is used for FactFlow progress data and is not meant to appear in the student's normal Google Drive files.
+For normal personal practice, progress is stored for the signed-in Google user and synced through the student's Google Drive app data folder. The sync file is used for FactFlow progress data and is not meant to appear in the student's normal Google Drive files.
 
-FactFlow does not require Firebase, a separate database, or a custom server.
+For normal personal practice, FactFlow does not submit progress to a teacher spreadsheet and does not require Firebase, a database, or a custom server.
 
-FactFlow does not store student names, class lists, or other unnecessary personal information in the progress data.
+For classroom submission mode, the student must open a valid class link such as `?t=IP5/8` or `?t=IP5/9`. In that mode, FactFlow sends practice-round data to the class Google Sheet through Google Apps Script. The submitted data includes the student's Google display name, Google email, class key, and practice-round progress details. This is used so the teacher can see classroom practice progress.
+
+Invalid class links fail closed and do not submit anywhere. The regular no-`?t=` FactFlow link remains personal practice only.
 
 If a student signs out, clears browser data, changes devices, loses internet access, or loses access to Google sync, locally cached progress on that device may not remain available. Synced progress can be restored when the student signs in again and sync is available.
 
@@ -231,7 +266,45 @@ If you deploy your own copy of FactFlow, update the Google OAuth client ID in `i
 6. Add your exact site URL under Authorized JavaScript origins. For GitHub Pages, this usually looks like `https://YOUR-USERNAME.github.io`.
 7. Replace `GOOGLE_CLIENT_ID` in `index.html` with your own OAuth client ID.
 
+Make sure the production origin is authorized in the Google OAuth client used by FactFlow:
+
+```text
+https://factflow.mtomlinson.ca
+```
+
 FactFlow uses Google Drive `appDataFolder` storage. This keeps the progress file separate from the student's normal visible Google Drive files.
+
+## Classroom submission deployment notes
+
+FactFlow includes classroom submission support and a combined Google Apps Script receiver.
+
+Important files:
+
+- `index.html`: the FactFlow practice app
+- `factflow-practice-apps-script.gs`: combined Google Sheets receiver for FactFlow practice submissions and existing FactFlow Check submissions
+- `CLASSROOM-SUBMISSION-SETUP.md`: detailed setup and testing checklist
+- `CNAME`: set for `factflow.mtomlinson.ca`
+
+Before classroom submission can work, each class spreadsheet's Apps Script project must be updated to use `factflow-practice-apps-script.gs`, deployed as a Web App, and connected to the matching URL in the `TEACHERS` map inside `index.html`.
+
+The current `TEACHERS` entries are:
+
+```javascript
+var TEACHERS = {
+  'IP5/9': {
+    name: 'Ajarn Michael - IP5/9',
+    url: 'https://script.google.com/macros/s/AKfycbyH5YG85Vbh6Gy03dUpOcJB6w4ifkO9tv4j3AsHdvSSJEHGUHvf-WL5JLsYi-vJYsEClg/exec'
+  },
+  'IP5/8': {
+    name: 'Ajarn Jordan - IP5/8',
+    url: 'https://script.google.com/macros/s/AKfycbwgJ0TKTAYtBVMv0cWLcUEbakBT-ZStjffCBqtdnjKS7xp5AaEr19FYnSIOgY9grCednA/exec'
+  }
+};
+```
+
+If Google creates a new Web App URL when you redeploy the Apps Script, update the matching `url` value in `index.html` before uploading the app.
+
+The practice app checks the receiver before sending practice data. If the old FactFlow Check-only receiver is still deployed, the app will fail closed and show that the receiver needs updating instead of sending practice data to the wrong sheet structure.
 
 ## Teacher settings
 
