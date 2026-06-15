@@ -7,6 +7,8 @@ This patch adds classroom submission to the regular FactFlow practice app.
 - `https://factflow.mtomlinson.ca` stays personal practice only.
 - `https://factflow.mtomlinson.ca?t=IP5/8` enables classroom mode for IP5/8.
 - `https://factflow.mtomlinson.ca?t=IP5/9` enables classroom mode for IP5/9.
+- `https://factflow.mtomlinson.ca?t=IP6/8` enables classroom mode for IP6/8.
+- `https://factflow.mtomlinson.ca?t=IP6/9` enables classroom mode for IP6/9.
 - Invalid `?t=` values fail closed and do not submit anywhere.
 
 For final production, the same rules apply on `https://factflow.mtomlinson.ca`.
@@ -24,6 +26,14 @@ var TEACHERS = {
   'IP5/8': {
     name: 'Ajarn Jordan - IP5/8',
     url: 'https://script.google.com/macros/s/AKfycbz1DSGVUh2rCaQBRAnf9SuXiF3Ki6tEXKSRNsoiKt-v8z8-UIMARxclA-YjCaU2fQO2OA/exec'
+  },
+  'IP6/8': {
+    name: 'Ajarn Josh - IP6/8',
+    url: 'https://script.google.com/macros/s/AKfycb_TODO_REPLACE_IP68_WEBAPP_URL_/exec'  // PLACEHOLDER — update before use
+  },
+  'IP6/9': {
+    name: 'Ajarn Josh - IP6/9',
+    url: 'https://script.google.com/macros/s/AKfycb_TODO_REPLACE_IP69_WEBAPP_URL_/exec'  // PLACEHOLDER — update before use
   }
 };
 ```
@@ -106,11 +116,13 @@ Test these links in this order:
 https://factflow.mtomlinson.ca
 https://factflow.mtomlinson.ca?t=IP5/8
 https://factflow.mtomlinson.ca?t=IP5/9
+https://factflow.mtomlinson.ca?t=IP6/8
+https://factflow.mtomlinson.ca?t=IP6/9
 https://factflow.mtomlinson.ca?t=INVALID
 ```
 
 Expected behavior:
 
 - The first link has no classroom submission UI.
-- IP5/8 and IP5/9 show classroom mode and auto-submit after completed rounds.
+- IP5/8, IP5/9, IP6/8, and IP6/9 show classroom mode and auto-submit after completed rounds.
 - The invalid class link fails closed and does not submit anywhere.

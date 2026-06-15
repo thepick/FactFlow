@@ -298,6 +298,14 @@ var TEACHERS = {
   'IP5/8': {
     name: 'Ajarn Jordan - IP5/8',
     url: 'https://script.google.com/macros/s/AKfycbwgJ0TKTAYtBVMv0cWLcUEbakBT-ZStjffCBqtdnjKS7xp5AaEr19FYnSIOgY9grCednA/exec'
+  },
+  'IP6/8': {
+    name: 'Ajarn Josh - IP6/8',
+    url: 'https://script.google.com/macros/s/AKfycb_TODO_REPLACE_IP68_WEBAPP_URL_/exec'  // PLACEHOLDER — update before use
+  },
+  'IP6/9': {
+    name: 'Ajarn Josh - IP6/9',
+    url: 'https://script.google.com/macros/s/AKfycb_TODO_REPLACE_IP69_WEBAPP_URL_/exec'  // PLACEHOLDER — update before use
   }
 };
 ```
