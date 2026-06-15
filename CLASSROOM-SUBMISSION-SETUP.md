@@ -29,11 +29,11 @@ var TEACHERS = {
   },
   'IP6/8': {
     name: 'Ajarn Josh - IP6/8',
-    url: 'https://script.google.com/macros/s/AKfycb_TODO_REPLACE_IP68_WEBAPP_URL_/exec'  // PLACEHOLDER — update before use
+    url: 'https://script.google.com/macros/s/AKfycbyJy786id7wxrcmooLTtht-durRYpvvxrjHlDteJm1_I4vy6qMLmFv56kUCsKJCn-2ZIQ/exec'
   },
   'IP6/9': {
     name: 'Ajarn Josh - IP6/9',
-    url: 'https://script.google.com/macros/s/AKfycb_TODO_REPLACE_IP69_WEBAPP_URL_/exec'  // PLACEHOLDER — update before use
+    url: 'https://script.google.com/macros/s/AKfycby4nJY3uDXL68oKV-7bBVyxJbVTbQeIdHJ4UZm3MeiBHrQ7lYfePdwEPMSqGoTMMKQc/exec'
   }
 };
 ```
