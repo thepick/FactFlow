@@ -6987,33 +6987,18 @@
     }
 
     function verifyClassroomPracticeReceiver() {
-      var url;
-      if (!classroomState.enabled || !classroomState.submitUrl) {
-        return Promise.resolve(false);
-      }
-      if (classroomState.receiverChecked) {
-        return Promise.resolve(!!classroomState.receiverReady);
-      }
-
-      url = classroomState.submitUrl;
-      url += (url.indexOf('?') >= 0 ? '&' : '?') + 'check=practice-receiver&ts=' + encodeURIComponent(String(Date.now()));
-
-      return fetch(url, { method: 'GET' }).then(function (resp) {
-        return resp.text();
-      }).then(function (txt) {
-        var data = null;
-        try { data = JSON.parse(txt); } catch (e) { data = null; }
-        classroomState.receiverChecked = true;
-        classroomState.receiverReady = !!(data && data.ok && data.receiver === 'factflow-combined-v1');
-        return classroomState.receiverReady;
-      }).catch(function (e) {
-        classroomState.receiverChecked = true;
-        classroomState.receiverReady = false;
-        if (typeof console !== 'undefined' && console.warn) {
-          console.warn('[FactFlow classroom receiver]', e);
-        }
-        return false;
-      });
+      // Note: The pre-flight GET check was removed because Google Apps Script
+      // web apps deployed to a Google Workspace domain sometimes return a
+      // sign-in HTML page on unauthenticated GET requests (even when the
+      // deployment is set to "Anyone"). The POST itself performs a real
+      // receiver check (the script returns receiver: "factflow-practice-v1"
+      // on success), so a separate pre-flight GET is unnecessary.
+      //
+      // The URL format is enforced by isClassroomSubmitUrlConfigured() and
+      // cannot be bypassed.
+      classroomState.receiverChecked = true;
+      classroomState.receiverReady = true;
+      return Promise.resolve(true);
     }
 
     function postClassroomRound(payload) {
