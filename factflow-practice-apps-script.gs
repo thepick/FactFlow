@@ -1,10 +1,20 @@
 // FactFlow / FactFlow Check - combined Google Sheets receiver
-// Paste this entire file into Extensions > Apps Script in each class Google Sheet.
+// Paste this entire file into Extensions > Apps Script in the target Google Sheet.
 // Deploy as Web App:
 //   Execute as: Me
 //   Who has access: Anyone
 // Use the V8 runtime.
 // After deploying, paste the Web App URL into the TEACHERS map in FactFlow index.html.
+
+// IMPORTANT:
+// This is the Google Spreadsheet ID, not the Apps Script ID.
+// From:
+// https://docs.google.com/spreadsheets/d/1fh1sQAT6YnA4e0zAPg_OTWEty1s4Jpsp8tF8YWEKngw/edit
+var TARGET_SPREADSHEET_ID = '1hLfZ0OJ5huE3OKg5w4wLvMLu5ImP2SDHdmtX89C7JJY';
+
+function getTargetSpreadsheet() {
+  return SpreadsheetApp.openById(TARGET_SPREADSHEET_ID);
+}
 
 function normalizeName(name) {
   return String(name || '').trim().replace(/\s+/g, ' ').split(' ').map(function (w) {
@@ -47,38 +57,31 @@ function doPost(e) {
 
 // -----------------------------------------------------------------------------
 // One-shot migration helper. Run this ONCE from the Apps Script editor
-// (select "migrateTabs" in the function dropdown, then Run) to rename any
-// legacy tabs to their canonical names without needing a student submission.
+// to rename legacy tabs to their canonical names.
 //
 // What it does:
-//   1. 'Practice Summary' -> 'FactFlow Practice'  (if 'Practice Summary' exists)
-//   2. 'FactFlow'         -> 'FactFlow Practice'  (only if 'FactFlow' still exists
-//                                                AND 'FactFlow Practice' does not -
-//                                                i.e. it cleans up any orphan tab
-//                                                left behind by an earlier script)
-//   3. 'Summary'          -> 'Check'              (if 'Summary' exists)
-//
-// It is safe to run multiple times. If a tab with the canonical name already
-// exists, that step is skipped. Run it, look at the Execution log, then delete
-// this function (or just leave it - it has no side effects when not invoked).
+//   1. 'Practice Summary' -> 'FactFlow Practice'
+//   2. 'FactFlow'         -> 'FactFlow Practice'
+//   3. 'Summary'          -> 'Check'
 // -----------------------------------------------------------------------------
 function migrateTabs() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = getTargetSpreadsheet();
   var log = [];
   var pairs = [
     ['Practice Summary', 'FactFlow Practice'],
-    ['FactFlow',         'FactFlow Practice'],
-    ['Summary',          'Check']
+    ['FactFlow', 'FactFlow Practice'],
+    ['Summary', 'Check']
   ];
+
   for (var i = 0; i < pairs.length; i += 1) {
     var from = pairs[i][0];
-    var to   = pairs[i][1];
-    // Don't rename 'FactFlow' to 'FactFlow Practice' if 'FactFlow Practice'
-    // already exists - that would throw and leave the orphan in place.
+    var to = pairs[i][1];
+
     if (to === 'FactFlow Practice' && ss.getSheetByName(to)) {
-      log.push("Skip '" + from + "' -> '" + to + "' (target already exists)");
+      log.push("Skip '" + from + "' -> '" + to + "' because target already exists");
       continue;
     }
+
     var sheet = ss.getSheetByName(from);
     if (sheet) {
       try {
@@ -88,42 +91,61 @@ function migrateTabs() {
         log.push("FAILED '" + from + "' -> '" + to + "': " + (e && e.message ? e.message : e));
       }
     } else {
-      log.push("Skip '" + from + "' (not present)");
+      log.push("Skip '" + from + "' because it is not present");
     }
   }
+
+  SpreadsheetApp.flush();
   Logger.log('migrateTabs complete:\n' + log.join('\n'));
   return log;
 }
 
 function doGet() {
-  return json({ ok: true, receiver: 'factflow-combined-v1', status: 'Receiver is online.' });
+  return json({
+    ok: true,
+    receiver: 'factflow-combined-v1',
+    status: 'Receiver is online.',
+    spreadsheetId: TARGET_SPREADSHEET_ID
+  });
 }
 
 // -----------------------------------------------------------------------------
-// FactFlow practice receiver
-// Visible practice summary tab: FactFlow Practice
-// Hidden practice log tab: Practice Raw Data
+// Manual diagnostic helper.
+// Run this from Apps Script if you want to prove the script is writing to the
+// correct spreadsheet.
 // -----------------------------------------------------------------------------
+function writeDiagnosticStamp() {
+  var ss = getTargetSpreadsheet();
+  var sheet = ss.getSheetByName('Script Diagnostic');
 
-// ensureSheet(ss, name, headers, hidden, legacyNames)
-//   name       - canonical tab name to look for / create
-//   headers    - header row to write if a new tab is created
-//   hidden     - true to hide a freshly created tab
-//   legacyNames - string OR array of strings. The first legacy tab found will be
-//                 renamed to `name`. Use this when renaming existing tabs so
-//                 historical data is preserved across script versions.
+  if (!sheet) {
+    sheet = ss.insertSheet('Script Diagnostic');
+  }
+
+  sheet.getRange('A1').setValue('Script wrote here at:');
+  sheet.getRange('B1').setValue(new Date());
+  sheet.getRange('A2').setValue('Spreadsheet ID:');
+  sheet.getRange('B2').setValue(TARGET_SPREADSHEET_ID);
+
+  SpreadsheetApp.flush();
+
+  return 'Wrote diagnostic stamp to spreadsheet ID ' + TARGET_SPREADSHEET_ID;
+}
+
+// -----------------------------------------------------------------------------
+// Generic sheet helper
+// -----------------------------------------------------------------------------
 function ensureSheet(ss, name, headers, hidden, legacyNames) {
   var sheet = ss.getSheetByName(name);
-  var legacySheet, i;
+  var legacySheet;
+  var i;
 
-  // Normalize legacyNames: accept a single string, an array, or null/undefined.
   if (legacyNames && !Array.isArray(legacyNames)) {
     legacyNames = [legacyNames];
   } else if (!legacyNames) {
     legacyNames = [];
   }
 
-  // Try each legacy name in order; rename the first match and stop.
   if (!sheet) {
     for (i = 0; i < legacyNames.length; i += 1) {
       legacySheet = ss.getSheetByName(legacyNames[i]);
@@ -142,11 +164,19 @@ function ensureSheet(ss, name, headers, hidden, legacyNames) {
   if (!sheet) {
     sheet = ss.insertSheet(name);
     sheet.appendRow(headers);
-    if (hidden) sheet.hideSheet();
+    if (hidden) {
+      sheet.hideSheet();
+    }
   }
+
   return sheet;
 }
 
+// -----------------------------------------------------------------------------
+// FactFlow practice receiver
+// Visible practice summary tab: FactFlow Practice
+// Hidden practice log tab: Practice Raw Data
+// -----------------------------------------------------------------------------
 function ensurePracticeRawSheet(ss) {
   return ensureSheet(ss, 'Practice Raw Data', [
     'Timestamp',
@@ -184,12 +214,6 @@ function ensurePracticeRawSheet(ss) {
 }
 
 function ensurePracticeSummarySheet(ss) {
-  // Canonical name: 'FactFlow Practice'.
-  // Legacy aliases (in priority order):
-  //   'FactFlow'         - the name used by the previous version of this script
-  //   'Practice Summary' - the original old name
-  // The first legacy tab found will be renamed to 'FactFlow Practice' on the
-  // next submission, preserving any historical student data.
   return ensureSheet(ss, 'FactFlow Practice', [
     'Student',
     'Email',
@@ -219,11 +243,19 @@ function hasRoundAlready(rawSheet, roundId) {
   var lastRow = rawSheet.getLastRow();
   var values;
   var i;
-  if (!roundId || lastRow < 2) return false;
-  values = rawSheet.getRange(2, 6, lastRow - 1, 1).getValues();
-  for (i = 0; i < values.length; i += 1) {
-    if (String(values[i][0]) === String(roundId)) return true;
+
+  if (!roundId || lastRow < 2) {
+    return false;
   }
+
+  values = rawSheet.getRange(2, 6, lastRow - 1, 1).getValues();
+
+  for (i = 0; i < values.length; i += 1) {
+    if (String(values[i][0]) === String(roundId)) {
+      return true;
+    }
+  }
+
   return false;
 }
 
@@ -271,14 +303,23 @@ function findPracticeSummaryRow(summary, studentKey, email, studentName) {
   var i;
 
   for (i = 1; i < values.length; i += 1) {
-    if (key && normalizeKey(values[i][2]) === key) return i + 1;
+    if (key && normalizeKey(values[i][2]) === key) {
+      return i + 1;
+    }
   }
+
   for (i = 1; i < values.length; i += 1) {
-    if (mail && normalizeKey(values[i][1]) === mail) return i + 1;
+    if (mail && normalizeKey(values[i][1]) === mail) {
+      return i + 1;
+    }
   }
+
   for (i = 1; i < values.length; i += 1) {
-    if (name && normalizeName(values[i][0]) === name) return i + 1;
+    if (name && normalizeName(values[i][0]) === name) {
+      return i + 1;
+    }
   }
+
   return -1;
 }
 
@@ -291,13 +332,22 @@ function getSubmittedRoundCount(rawSheet, studentKey, email, studentName) {
   var count = 0;
   var i;
 
-  if (lastRow < 2) return 0;
-  values = rawSheet.getRange(2, 1, lastRow - 1, 31).getValues();
-  for (i = 0; i < values.length; i += 1) {
-    if (key && normalizeKey(values[i][3]) === key) count += 1;
-    else if (!key && mail && normalizeKey(values[i][2]) === mail) count += 1;
-    else if (!key && !mail && name && normalizeName(values[i][1]) === name) count += 1;
+  if (lastRow < 2) {
+    return 0;
   }
+
+  values = rawSheet.getRange(2, 1, lastRow - 1, 31).getValues();
+
+  for (i = 0; i < values.length; i += 1) {
+    if (key && normalizeKey(values[i][3]) === key) {
+      count += 1;
+    } else if (!key && mail && normalizeKey(values[i][2]) === mail) {
+      count += 1;
+    } else if (!key && !mail && name && normalizeName(values[i][1]) === name) {
+      count += 1;
+    }
+  }
+
   return count;
 }
 
@@ -308,6 +358,7 @@ function upsertPracticeSummary(summary, rawSheet, data) {
   var row = findPracticeSummaryRow(summary, studentKey, studentEmail, studentName);
   var graduationText = data.graduated ? String(data.graduatedFrom || '') + ' to ' + String(data.graduatedTo || '') : '';
   var totalSubmitted = getSubmittedRoundCount(rawSheet, studentKey, studentEmail, studentName);
+
   var rowValues = [
     studentName,
     studentEmail,
@@ -347,124 +398,199 @@ function upsertPracticeSummary(summary, rawSheet, data) {
 
 function handleFactFlowPractice(data) {
   var lock = null;
+
   try {
-    if (!data.roundId) throw new Error('Missing roundId.');
-    if (!data.studentName && !data.studentEmail) throw new Error('Missing student identity.');
+    if (!data.roundId) {
+      throw new Error('Missing roundId.');
+    }
+
+    if (!data.studentName && !data.studentEmail) {
+      throw new Error('Missing student identity.');
+    }
 
     lock = LockService.getScriptLock();
     lock.waitLock(10000);
 
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ss = getTargetSpreadsheet();
     var rawSheet = ensurePracticeRawSheet(ss);
     var summary = ensurePracticeSummarySheet(ss);
 
     if (!hasRoundAlready(rawSheet, data.roundId)) {
       appendPracticeRaw(rawSheet, data);
     }
+
     upsertPracticeSummary(summary, rawSheet, data);
 
-    return json({ ok: true, receiver: 'factflow-practice-v1', student: normalizeName(data.studentName), roundId: data.roundId });
+    SpreadsheetApp.flush();
+
+    return json({
+      ok: true,
+      receiver: 'factflow-practice-v1',
+      student: normalizeName(data.studentName),
+      roundId: data.roundId,
+      spreadsheetId: TARGET_SPREADSHEET_ID
+    });
   } catch (err) {
-    return json({ ok: false, receiver: 'factflow-practice-v1', error: err && err.message ? err.message : String(err) });
+    return json({
+      ok: false,
+      receiver: 'factflow-practice-v1',
+      error: err && err.message ? err.message : String(err),
+      spreadsheetId: TARGET_SPREADSHEET_ID
+    });
   } finally {
     if (lock) {
-      try { lock.releaseLock(); } catch (e) {}
+      try {
+        lock.releaseLock();
+      } catch (e) {}
     }
   }
 }
 
 // -----------------------------------------------------------------------------
-// Existing FactFlow Check receiver behavior
+// FactFlow Check receiver
 // Visible check summary tab: Check
 // Hidden check log tab: Raw Data
 // -----------------------------------------------------------------------------
+function ensureCheckRawSheet(ss) {
+  var rawSheet = ss.getSheetByName('Raw Data');
+
+  if (!rawSheet) {
+    rawSheet = ss.insertSheet('Raw Data');
+    rawSheet.appendRow([
+      'Timestamp',
+      'Student',
+      'Code',
+      'Assessment',
+      'Verified',
+      'Developing',
+      'Accuracy %',
+      'Fluent',
+      'Slow',
+      'Wrong',
+      'Timeout',
+      'Questions',
+      'Missed Facts',
+      'Duration sec'
+    ]);
+    rawSheet.hideSheet();
+  }
+
+  return rawSheet;
+}
+
+function ensureCheckSummarySheet(ss) {
+  return ensureSheet(ss, 'Check', [
+    'Student',
+    'Date',
+    'Code',
+    'Verified',
+    'Developing',
+    'Accuracy %',
+    'Fluent',
+    'Slow',
+    'Missed',
+    'Facts to Review'
+  ], false, 'Summary');
+}
+
+function findCheckSummaryRow(summary, studentName) {
+  var summaryData = summary.getDataRange().getValues();
+  var normalizedStudentName = normalizeName(studentName);
+  var i;
+
+  for (i = 1; i < summaryData.length; i += 1) {
+    if (normalizeName(summaryData[i][0]) === normalizedStudentName) {
+      return i + 1;
+    }
+  }
+
+  return -1;
+}
+
+function appendCheckRaw(rawSheet, data, studentName) {
+  rawSheet.appendRow([
+    data.completedAt ? new Date(data.completedAt) : new Date(),
+    studentName,
+    data.code || '',
+    data.assessmentName || '',
+    data.verifiedBand || '',
+    data.developingBand || '',
+    data.accuracy != null ? data.accuracy : '',
+    data.fluent != null ? data.fluent : '',
+    data.slow != null ? data.slow : '',
+    data.wrong != null ? data.wrong : '',
+    data.timeout != null ? data.timeout : '',
+    data.totalQuestions != null ? data.totalQuestions : '',
+    (data.missedFacts || []).join(', '),
+    data.durationSec != null ? data.durationSec : ''
+  ]);
+}
+
+function upsertCheckSummary(summary, data, studentName) {
+  var foundRow = findCheckSummaryRow(summary, studentName);
+
+  var rowValues = [
+    studentName,
+    data.completedAt ? new Date(data.completedAt) : new Date(),
+    data.code || '',
+    data.verifiedBand || '',
+    data.developingBand || '',
+    data.accuracy != null ? data.accuracy + '%' : '',
+    data.fluent != null ? data.fluent : '',
+    data.slow != null ? data.slow : '',
+    (data.wrong || 0) + (data.timeout || 0),
+    (data.missedFacts || []).join(', ')
+  ];
+
+  if (foundRow > 0) {
+    summary.getRange(foundRow, 1, 1, rowValues.length).setValues([rowValues]);
+  } else {
+    summary.appendRow(rowValues);
+  }
+
+  if (summary.getLastRow() > 1) {
+    summary.getRange(2, 1, summary.getLastRow() - 1, summary.getLastColumn())
+      .sort({ column: 1, ascending: true });
+    summary.getRange(2, 2, summary.getLastRow() - 1, 1).setNumberFormat('yyyy-MM-dd HH:mm');
+  }
+}
 
 function handleFactFlowCheck(data) {
   var lock = null;
+
   try {
     var studentName = normalizeName(data.studentName) || 'Unknown';
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-
-    var rawSheet = ss.getSheetByName('Raw Data');
-    if (!rawSheet) {
-      rawSheet = ss.insertSheet('Raw Data');
-      rawSheet.appendRow([
-        'Timestamp', 'Student', 'Code', 'Assessment',
-        'Verified', 'Developing', 'Accuracy %', 'Fluent',
-        'Slow', 'Wrong', 'Timeout', 'Questions',
-        'Missed Facts', 'Restarted', 'Duration sec'
-      ]);
-      rawSheet.hideSheet();
-    }
-
-    rawSheet.appendRow([
-      data.completedAt ? new Date(data.completedAt) : new Date(),
-      studentName,
-      data.code || '',
-      data.assessmentName || '',
-      data.verifiedBand || '',
-      data.developingBand || '',
-      data.accuracy != null ? data.accuracy : '',
-      data.fluent != null ? data.fluent : '',
-      data.slow != null ? data.slow : '',
-      data.wrong != null ? data.wrong : '',
-      data.timeout != null ? data.timeout : '',
-      data.totalQuestions != null ? data.totalQuestions : '',
-      (data.missedFacts || []).join(', '),
-      data.restarted ? 'Yes (' + (data.restartCount || 0) + ')' : 'No',
-      data.durationSec != null ? data.durationSec : ''
-    ]);
 
     lock = LockService.getScriptLock();
     lock.waitLock(10000);
 
-    var summary = ensureSheet(ss, 'Check', [
-      'Student', 'Date', 'Code', 'Verified', 'Developing',
-      'Accuracy %', 'Fluent', 'Slow', 'Missed', 'Facts to Review', 'Restart?'
-    ], false, 'Summary');
+    var ss = getTargetSpreadsheet();
+    var rawSheet = ensureCheckRawSheet(ss);
+    var summary = ensureCheckSummarySheet(ss);
 
-    var summaryData = summary.getDataRange().getValues();
-    var foundRow = -1;
-    for (var i = 1; i < summaryData.length; i += 1) {
-      if (normalizeName(summaryData[i][0]) === studentName) {
-        foundRow = i;
-        break;
-      }
-    }
+    appendCheckRaw(rawSheet, data, studentName);
+    upsertCheckSummary(summary, data, studentName);
 
-    var rowValues = [
-      studentName,
-      data.completedAt ? new Date(data.completedAt) : new Date(),
-      data.code || '',
-      data.verifiedBand || '',
-      data.developingBand || '',
-      data.accuracy != null ? data.accuracy + '%' : '',
-      data.fluent != null ? data.fluent : '',
-      data.slow != null ? data.slow : '',
-      (data.wrong || 0) + (data.timeout || 0),
-      (data.missedFacts || []).join(', '),
-      data.restarted ? 'Yes' : 'No'
-    ];
+    SpreadsheetApp.flush();
 
-    if (foundRow >= 0) {
-      summary.getRange(foundRow + 1, 1, 1, rowValues.length).setValues([rowValues]);
-    } else {
-      summary.appendRow(rowValues);
-    }
-
-    var lastRow = summary.getLastRow();
-    if (lastRow > 1) {
-      summary.getRange(2, 1, lastRow - 1, summary.getLastColumn())
-        .sort({ column: 1, ascending: true });
-      summary.getRange(2, 2, lastRow - 1, 1).setNumberFormat('yyyy-MM-dd HH:mm');
-    }
-
-    return json({ ok: true, receiver: 'factflow-check-v1', student: studentName });
+    return json({
+      ok: true,
+      receiver: 'factflow-check-v1',
+      student: studentName,
+      spreadsheetId: TARGET_SPREADSHEET_ID
+    });
   } catch (err) {
-    return json({ ok: false, receiver: 'factflow-check-v1', error: err && err.message ? err.message : String(err) });
+    return json({
+      ok: false,
+      receiver: 'factflow-check-v1',
+      error: err && err.message ? err.message : String(err),
+      spreadsheetId: TARGET_SPREADSHEET_ID
+    });
   } finally {
     if (lock) {
-      try { lock.releaseLock(); } catch (e) {}
+      try {
+        lock.releaseLock();
+      } catch (e) {}
     }
   }
 }
