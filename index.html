@@ -7048,6 +7048,43 @@
       return Promise.resolve(true);
     }
 
+    function isClassroomReceiverNameAcceptable(data) {
+      var receiver = String(data && data.receiver ? data.receiver : '').trim();
+
+      if (!receiver) return true;
+      if (receiver === 'factflow-practice-v1') return true;
+      if (receiver.indexOf('factflow-practice-') === 0) return true;
+      if (receiver.indexOf('factflow-combined-') === 0) return true;
+
+      return false;
+    }
+
+    function isTypedColumnNumberFormatErrorMessage(message) {
+      var lower = String(message || '').toLowerCase();
+
+      return lower.indexOf('typed column') !== -1 ||
+        lower.indexOf("can't set the number format") !== -1 ||
+        lower.indexOf('cannot set the number format') !== -1 ||
+        lower.indexOf('set the number format of cells') !== -1;
+    }
+
+    function isExpectedClassroomSpreadsheet(data) {
+      var returnedSpreadsheetId = String(data && data.spreadsheetId ? data.spreadsheetId : '').trim();
+      var expectedSpreadsheetId = String(classroomState.expectedSpreadsheetId || '').trim();
+
+      if (!returnedSpreadsheetId) return false;
+      if (expectedSpreadsheetId && returnedSpreadsheetId !== expectedSpreadsheetId) return false;
+
+      return true;
+    }
+
+    function markClassroomSubmitOk(data, message) {
+      classroomState.lastSubmitOk = true;
+      classroomState.lastSubmitError = '';
+      classroomState.lastSubmittedSpreadsheetId = data && data.spreadsheetId ? data.spreadsheetId : '';
+      updateClassroomSubmitUi('ok', message || ('Class progress sent to ' + classroomState.teacherKey + ' sheet.'));
+    }
+
     function postClassroomRound(payload) {
       fetch(classroomState.submitUrl, {
         method: 'POST',
@@ -7057,31 +7094,58 @@
         return resp.text();
       }).then(function (txt) {
         var data = null;
-        try { data = JSON.parse(txt); } catch (e) { data = null; }
-        if (data && data.ok && data.receiver === 'factflow-practice-v1') {
-          if (!data.spreadsheetId) {
-            classroomState.lastSubmitOk = false;
-            classroomState.lastSubmitError = 'Practice receiver did not return a spreadsheet ID. Upload not trusted.';
-            updateClassroomSubmitUi('error', 'Send failed. Receiver did not confirm the target sheet.');
-            return;
-          }
+        var errorMessage = '';
+        var responseText = String(txt || '').trim();
 
-          if (classroomState.expectedSpreadsheetId && String(data.spreadsheetId) !== String(classroomState.expectedSpreadsheetId)) {
-            classroomState.lastSubmitOk = false;
-            classroomState.lastSubmitError = 'Wrong spreadsheet returned. Expected ' + classroomState.expectedSpreadsheetId + ' but receiver used ' + data.spreadsheetId + '.';
-            updateClassroomSubmitUi('error', 'Send failed. Wrong class sheet was returned; upload not trusted.');
-            return;
-          }
+        try { data = JSON.parse(responseText); } catch (e) { data = null; }
 
-          classroomState.lastSubmitOk = true;
-          classroomState.lastSubmitError = '';
-          classroomState.lastSubmittedSpreadsheetId = data.spreadsheetId;
-          updateClassroomSubmitUi('ok', 'Class progress sent to ' + classroomState.teacherKey + ' sheet.');
-        } else {
+        if (!data) {
           classroomState.lastSubmitOk = false;
-          classroomState.lastSubmitError = data && data.error ? data.error : 'Practice receiver did not confirm the submission.';
-          updateClassroomSubmitUi('error', classroomState.lastSubmitError || 'Send failed. Try again.');
+          classroomState.lastSubmitError = responseText ? ('Receiver returned non-JSON response: ' + responseText.slice(0, 180)) : 'Receiver returned an empty response.';
+          updateClassroomSubmitUi('error', 'Send failed. Receiver did not return JSON.');
+          return;
         }
+
+        if (classroomState.expectedSpreadsheetId && data.spreadsheetId && String(data.spreadsheetId) !== String(classroomState.expectedSpreadsheetId)) {
+          classroomState.lastSubmitOk = false;
+          classroomState.lastSubmitError = 'Wrong spreadsheet returned. Expected ' + classroomState.expectedSpreadsheetId + ' but receiver used ' + data.spreadsheetId + '.';
+          updateClassroomSubmitUi('error', 'Send failed. Wrong class sheet was returned; upload not trusted.');
+          return;
+        }
+
+        if (data.ok && isExpectedClassroomSpreadsheet(data) && isClassroomReceiverNameAcceptable(data)) {
+          markClassroomSubmitOk(data, 'Class progress sent to ' + classroomState.teacherKey + ' sheet.');
+          return;
+        }
+
+        errorMessage = data && data.error ? String(data.error) : '';
+
+        // Old receiver versions can write the row successfully, then fail only when
+        // Google Sheets rejects cosmetic date formatting on a typed column. In that
+        // exact case, the response is ok:false but includes the expected spreadsheet
+        // ID. Treat that as a soft success so students do not see a false send error.
+        if (!data.ok && isTypedColumnNumberFormatErrorMessage(errorMessage) && isExpectedClassroomSpreadsheet(data) && isClassroomReceiverNameAcceptable(data)) {
+          markClassroomSubmitOk(data, 'Class progress saved to ' + classroomState.teacherKey + ' sheet.');
+          return;
+        }
+
+        if (data.ok && !data.spreadsheetId) {
+          classroomState.lastSubmitOk = false;
+          classroomState.lastSubmitError = 'Practice receiver did not return a spreadsheet ID. Upload not trusted.';
+          updateClassroomSubmitUi('error', 'Send failed. Receiver did not confirm the target sheet.');
+          return;
+        }
+
+        if (data.ok && !isClassroomReceiverNameAcceptable(data)) {
+          classroomState.lastSubmitOk = false;
+          classroomState.lastSubmitError = 'Unexpected receiver: ' + String(data.receiver || 'unknown');
+          updateClassroomSubmitUi('error', 'Send failed. Unexpected receiver response.');
+          return;
+        }
+
+        classroomState.lastSubmitOk = false;
+        classroomState.lastSubmitError = errorMessage || 'Practice receiver did not confirm the submission.';
+        updateClassroomSubmitUi('error', classroomState.lastSubmitError || 'Send failed. Try again.');
       }).catch(function (e) {
         classroomState.lastSubmitOk = false;
         classroomState.lastSubmitError = e && e.message ? e.message : 'Network error';
