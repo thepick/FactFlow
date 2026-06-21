@@ -17,6 +17,8 @@
 //
 // There is deliberately NO fallback spreadsheet. If a submission does not include
 // a valid class code, the upload is rejected before any sheet is opened or written.
+var BUILD_VERSION = 'factflow-practice-v2-no-number-format';
+
 var CLASS_SPREADSHEET_IDS = {
   'ip5/8': '1VYs2dbduN8s5R3YEoOzIqQO2fnHko0YQypd3MYKn3Wg',
   'ip5/9': '1hLfZ0OJ5huE3OKg5w4wLvMLu5ImP2SDHdmtX89C7JJY',
@@ -144,6 +146,34 @@ function doPost(e) {
 }
 
 // -----------------------------------------------------------------------------
+// Forgiving helpers
+// -----------------------------------------------------------------------------
+function safeSortRange(sheet, startRow, startCol, numRows, numCols, sortColumn, ascending) {
+  if (!sheet || numRows < 2 || numCols < 1) {
+    return false;
+  }
+
+  try {
+    sheet.getRange(startRow, startCol, numRows, numCols)
+      .sort({ column: sortColumn, ascending: ascending });
+    return true;
+  } catch (err) {
+    Logger.log('safeSortRange: skipped sort on sheet "' + sheet.getName() + '". Data was still written. Error: ' + (err && err.message ? err.message : String(err)));
+    return false;
+  }
+}
+
+function safeFlush() {
+  try {
+    safeFlush();
+    return true;
+  } catch (err) {
+    Logger.log('safeFlush: flush failed after writes were requested. Error: ' + (err && err.message ? err.message : String(err)));
+    return false;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // One-shot migration helper. Run this ONCE from the Apps Script editor
 // to rename legacy tabs to their canonical names.
 //
@@ -183,7 +213,7 @@ function migrateTabs(classCode) {
     }
   }
 
-  SpreadsheetApp.flush();
+  safeFlush();
   Logger.log('migrateTabs complete:\n' + log.join('\n'));
   return log;
 }
@@ -197,6 +227,7 @@ function doGet(e) {
     return json({
       ok: false,
       receiver: 'factflow-combined-v1',
+      buildVersion: BUILD_VERSION,
       status: 'Receiver is online, but no valid class route was provided.',
       error: err && err.message ? err.message : String(err),
       allowedSpreadsheetIds: getAllowedSpreadsheetIds(),
@@ -207,6 +238,7 @@ function doGet(e) {
   return json({
     ok: true,
     receiver: 'factflow-combined-v1',
+      buildVersion: BUILD_VERSION,
     status: 'Receiver is online.',
     spreadsheetId: spreadsheetId,
     allowedSpreadsheetIds: getAllowedSpreadsheetIds(),
@@ -233,7 +265,7 @@ function writeDiagnosticStamp(classCode) {
   sheet.getRange('A2').setValue('Spreadsheet ID:');
   sheet.getRange('B2').setValue(spreadsheetId);
 
-  SpreadsheetApp.flush();
+  safeFlush();
 
   return 'Wrote diagnostic stamp to spreadsheet ID ' + spreadsheetId;
 }
@@ -496,9 +528,7 @@ function upsertPracticeSummary(summary, rawSheet, data) {
   }
 
   if (summary.getLastRow() > 1) {
-    summary.getRange(2, 1, summary.getLastRow() - 1, summary.getLastColumn())
-      .sort({ column: 1, ascending: true });
-    summary.getRange(2, 5, summary.getLastRow() - 1, 1).setNumberFormat('yyyy-MM-dd HH:mm');
+    safeSortRange(summary, 2, 1, summary.getLastRow() - 1, summary.getLastColumn(), 1, true);
   }
 }
 
@@ -529,11 +559,12 @@ function handleFactFlowPractice(data, e) {
 
     upsertPracticeSummary(summary, rawSheet, data);
 
-    SpreadsheetApp.flush();
+    safeFlush();
 
     return json({
       ok: true,
       receiver: 'factflow-practice-v1',
+      buildVersion: BUILD_VERSION,
       student: normalizeName(data.studentName),
       roundId: data.roundId,
       spreadsheetId: spreadsheetId,
@@ -543,6 +574,7 @@ function handleFactFlowPractice(data, e) {
     return json({
       ok: false,
       receiver: 'factflow-practice-v1',
+      buildVersion: BUILD_VERSION,
       error: err && err.message ? err.message : String(err),
       spreadsheetId: spreadsheetId,
       classCode: data.teacherKey || data.class || data.teacher || data.t || ''
@@ -659,9 +691,7 @@ function upsertCheckSummary(summary, data, studentName) {
   }
 
   if (summary.getLastRow() > 1) {
-    summary.getRange(2, 1, summary.getLastRow() - 1, summary.getLastColumn())
-      .sort({ column: 1, ascending: true });
-    summary.getRange(2, 2, summary.getLastRow() - 1, 1).setNumberFormat('yyyy-MM-dd HH:mm');
+    safeSortRange(summary, 2, 1, summary.getLastRow() - 1, summary.getLastColumn(), 1, true);
   }
 }
 
@@ -683,11 +713,12 @@ function handleFactFlowCheck(data, e) {
     appendCheckRaw(rawSheet, data, studentName);
     upsertCheckSummary(summary, data, studentName);
 
-    SpreadsheetApp.flush();
+    safeFlush();
 
     return json({
       ok: true,
       receiver: 'factflow-check-v1',
+      buildVersion: BUILD_VERSION,
       student: studentName,
       spreadsheetId: spreadsheetId
     });
@@ -695,6 +726,7 @@ function handleFactFlowCheck(data, e) {
     return json({
       ok: false,
       receiver: 'factflow-check-v1',
+      buildVersion: BUILD_VERSION,
       error: err && err.message ? err.message : String(err),
       spreadsheetId: spreadsheetId
     });
