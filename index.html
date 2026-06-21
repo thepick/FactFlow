@@ -1684,23 +1684,40 @@
     // must be updated to the combined receiver in factflow-practice-apps-script.gs.
     var CLASSROOM_SUBMIT_VERSION = 'factflow-practice-submit-v1';
     var TEACHERS = {
-      'IP5/9': {
-        name: 'Ajarn Michael - IP5/9',
-        url: 'https://script.google.com/a/macros/ku.th/s/AKfycbxgXxJFgOHGi39oPEHGybpPByBHhfVeLLQRhI2cy8l78_gHo35D8fYSVzc8jPUQmz1EdA/exec'
-      },
       'IP5/8': {
         name: 'Ajarn Jordan - IP5/8',
+        spreadsheetId: '1VYs2dbduN8s5R3YEoOzIqQO2fnHko0YQypd3MYKn3Wg',
         url: 'https://script.google.com/macros/s/AKfycbz1DSGVUh2rCaQBRAnf9SuXiF3Ki6tEXKSRNsoiKt-v8z8-UIMARxclA-YjCaU2fQO2OA/exec'
+      },
+      'IP5/9': {
+        name: 'Ajarn Michael - IP5/9',
+        spreadsheetId: '1hLfZ0OJ5huE3OKg5w4wLvMLu5ImP2SDHdmtX89C7JJY',
+        url: 'https://script.google.com/a/macros/ku.th/s/AKfycbxgXxJFgOHGi39oPEHGybpPByBHhfVeLLQRhI2cy8l78_gHo35D8fYSVzc8jPUQmz1EdA/exec'
       },
       'IP6/8': {
         name: 'Ajarn Josh - IP6/8',
+        spreadsheetId: '14bjzUQ3tq_An3Ef5VSydZ84LrXueqk0oJF8HmUyihiI',
         url: 'https://script.google.com/macros/s/AKfycbyJy786id7wxrcmooLTtht-durRYpvvxrjHlDteJm1_I4vy6qMLmFv56kUCsKJCn-2ZIQ/exec'
       },
       'IP6/9': {
         name: 'Ajarn Josh - IP6/9',
+        spreadsheetId: '1iY1_YWHFvFDtvwz5FyWJtbnKCq8ixSIjGpysJ1LSg7Y',
         url: 'https://script.google.com/macros/s/AKfycby4nJY3uDXL68oKV-7bBVyxJbVTbQeIdHJ4UZm3MeiBHrQ7lYfePdwEPMSqGoTMMKQc/exec'
       }
     };
+
+    function normalizeClassroomRouteKey(value) {
+      return String(value || '').trim().toUpperCase();
+    }
+
+    function getValidClassroomRouteList() {
+      var keys = [];
+      var key;
+      for (key in TEACHERS) {
+        if (Object.prototype.hasOwnProperty.call(TEACHERS, key)) keys.push(key);
+      }
+      return keys.join(', ');
+    }
 
     // ═══════════════════════════ STATE ═══════════════════════════
     var state = {
@@ -1712,13 +1729,16 @@
       teacherKey: '',
       teacherName: '',
       submitUrl: '',
+      expectedSpreadsheetId: '',
+      routeError: '',
       lastRoundId: '',
       lastPayload: null,
       lastSubmitOk: false,
       lastSubmitError: '',
       statusMode: '',
       receiverChecked: false,
-      receiverReady: false
+      receiverReady: false,
+      lastSubmittedSpreadsheetId: ''
     };
 
     var round = null;
@@ -2068,6 +2088,7 @@
 
     function initClassroomMode() {
       var params;
+      var rawKey;
       var key;
       var teacher;
 
@@ -2075,11 +2096,16 @@
       classroomState.teacherKey = '';
       classroomState.teacherName = '';
       classroomState.submitUrl = '';
+      classroomState.expectedSpreadsheetId = '';
+      classroomState.routeError = '';
+      classroomState.lastSubmittedSpreadsheetId = '';
 
       try {
         params = new URLSearchParams(window.location.search || '');
-        key = params.get('t');
+        rawKey = params.get('t');
+        key = normalizeClassroomRouteKey(rawKey);
       } catch (e) {
+        rawKey = '';
         key = '';
       }
 
@@ -2089,10 +2115,16 @@
         classroomState.teacherKey = key;
         classroomState.teacherName = teacher.name || key;
         classroomState.submitUrl = teacher.url || '';
-      } else if (key && window.console && console.warn) {
-        console.warn('FactFlow classroom mode ignored invalid teacher key:', key);
+        classroomState.expectedSpreadsheetId = teacher.spreadsheetId || '';
+      } else if (rawKey) {
+        classroomState.enabled = true;
+        classroomState.teacherKey = key || String(rawKey || '').trim();
+        classroomState.teacherName = 'Unknown class route';
+        classroomState.routeError = 'Unknown class code "' + String(rawKey || '').trim() + '". Upload cancelled. Use one of: ' + getValidClassroomRouteList() + '.';
+        if (window.console && console.warn) console.warn('FactFlow classroom mode rejected invalid teacher key:', rawKey);
       }
     }
+
 
     function isClassroomSubmitUrlConfigured() {
       return !!(classroomState.submitUrl && (
@@ -2131,7 +2163,7 @@
     }
 
     function canSubmitClassroomRound() {
-      return !!(classroomState.enabled && isClassroomSubmitUrlConfigured() && getRealGoogleUser());
+      return !!(classroomState.enabled && !classroomState.routeError && classroomState.expectedSpreadsheetId && isClassroomSubmitUrlConfigured() && getRealGoogleUser());
     }
 
     function updateClassroomSubmitUi(mode, message) {
@@ -2153,8 +2185,16 @@
       el.classroomSubmitBox.classList.remove('hidden');
       el.classroomBadge.textContent = 'Classroom mode: ' + classroomState.teacherName;
 
-      if (!isClassroomSubmitUrlConfigured()) {
-        text = 'Practice receiver URL not configured yet.';
+      if (classroomState.routeError) {
+        text = classroomState.routeError;
+        statusClass += ' error';
+        if (el.classroomRetryBtn) el.classroomRetryBtn.classList.add('hidden');
+      } else if (!classroomState.expectedSpreadsheetId) {
+        text = 'No target spreadsheet is configured for ' + classroomState.teacherKey + '. Upload cancelled.';
+        statusClass += ' error';
+        if (el.classroomRetryBtn) el.classroomRetryBtn.classList.add('hidden');
+      } else if (!isClassroomSubmitUrlConfigured()) {
+        text = 'Practice receiver URL not configured for ' + classroomState.teacherKey + '. Upload cancelled.';
         statusClass += ' error';
         if (el.classroomRetryBtn) el.classroomRetryBtn.classList.add('hidden');
       } else if (!user) {
@@ -6927,6 +6967,7 @@
         submitVersion: CLASSROOM_SUBMIT_VERSION,
         teacherKey: classroomState.teacherKey,
         teacherName: classroomState.teacherName,
+        expectedSpreadsheetId: classroomState.expectedSpreadsheetId,
         roundId: snapshot.roundId,
         submittedAt: new Date().toISOString(),
         deviceId: syncState.deviceId || getDeviceId(),
@@ -6970,6 +7011,12 @@
       var payload;
 
       if (!classroomState.enabled || !snapshot || !progress) return;
+      if (classroomState.routeError) {
+        classroomState.lastSubmitOk = false;
+        classroomState.lastSubmitError = classroomState.routeError;
+        updateClassroomSubmitUi('error', classroomState.routeError);
+        return;
+      }
       if (snapshot.roundId && classroomState.lastRoundId === snapshot.roundId) return;
 
       payload = buildClassroomRoundPayload(snapshot, progress);
@@ -7012,13 +7059,28 @@
         var data = null;
         try { data = JSON.parse(txt); } catch (e) { data = null; }
         if (data && data.ok && data.receiver === 'factflow-practice-v1') {
+          if (!data.spreadsheetId) {
+            classroomState.lastSubmitOk = false;
+            classroomState.lastSubmitError = 'Practice receiver did not return a spreadsheet ID. Upload not trusted.';
+            updateClassroomSubmitUi('error', 'Send failed. Receiver did not confirm the target sheet.');
+            return;
+          }
+
+          if (classroomState.expectedSpreadsheetId && String(data.spreadsheetId) !== String(classroomState.expectedSpreadsheetId)) {
+            classroomState.lastSubmitOk = false;
+            classroomState.lastSubmitError = 'Wrong spreadsheet returned. Expected ' + classroomState.expectedSpreadsheetId + ' but receiver used ' + data.spreadsheetId + '.';
+            updateClassroomSubmitUi('error', 'Send failed. Wrong class sheet was returned; upload not trusted.');
+            return;
+          }
+
           classroomState.lastSubmitOk = true;
           classroomState.lastSubmitError = '';
-          updateClassroomSubmitUi('ok');
+          classroomState.lastSubmittedSpreadsheetId = data.spreadsheetId;
+          updateClassroomSubmitUi('ok', 'Class progress sent to ' + classroomState.teacherKey + ' sheet.');
         } else {
           classroomState.lastSubmitOk = false;
           classroomState.lastSubmitError = data && data.error ? data.error : 'Practice receiver did not confirm the submission.';
-          updateClassroomSubmitUi('error', 'Send failed. Try again.');
+          updateClassroomSubmitUi('error', classroomState.lastSubmitError || 'Send failed. Try again.');
         }
       }).catch(function (e) {
         classroomState.lastSubmitOk = false;
@@ -7029,6 +7091,12 @@
 
     function sendClassroomRound(payload) {
       if (!payload || !classroomState.enabled) return;
+      if (classroomState.routeError) {
+        classroomState.lastSubmitOk = false;
+        classroomState.lastSubmitError = classroomState.routeError;
+        updateClassroomSubmitUi('error', classroomState.routeError);
+        return;
+      }
       if (!canSubmitClassroomRound()) {
         classroomState.statusMode = 'waiting';
         updateClassroomSubmitUi('waiting');
@@ -7036,6 +7104,9 @@
       }
 
       attachClassroomIdentity(payload);
+      payload.teacherKey = classroomState.teacherKey;
+      payload.teacherName = classroomState.teacherName;
+      payload.expectedSpreadsheetId = classroomState.expectedSpreadsheetId;
       payload.submittedAt = new Date().toISOString();
       updateClassroomSubmitUi('sending');
 
@@ -8225,4 +8296,3 @@
   </script>
 </body>
 </html>
-
