@@ -5,15 +5,103 @@
 //   Who has access: Anyone
 // Use the V8 runtime.
 // After deploying, paste the Web App URL into the TEACHERS map in FactFlow index.html.
-
+//
 // IMPORTANT:
-// This is the Google Spreadsheet ID, not the Apps Script ID.
-// From:
-// https://docs.google.com/spreadsheets/d/1fh1sQAT6YnA4e0zAPg_OTWEty1s4Jpsp8tF8YWEKngw/edit
-var TARGET_SPREADSHEET_ID = '1hLfZ0OJ5huE3OKg5w4wLvMLu5ImP2SDHdmtX89C7JJY';
+// These are Google Spreadsheet IDs, not Apps Script IDs.
+//
+// Class routing is strict and fail-closed:
+//   https://factflow.mtomlinson.ca/?t=IP5/8 -> IP5/8 sheet
+//   https://factflow.mtomlinson.ca/?t=IP5/9 -> IP5/9 sheet
+//   https://factflow.mtomlinson.ca/?t=IP6/8 -> IP6/8 sheet
+//   https://factflow.mtomlinson.ca/?t=IP6/9 -> IP6/9 sheet
+//
+// There is deliberately NO fallback spreadsheet. If a submission does not include
+// a valid class code, the upload is rejected before any sheet is opened or written.
+var CLASS_SPREADSHEET_IDS = {
+  'ip5/8': '1VYs2dbduN8s5R3YEoOzIqQO2fnHko0YQypd3MYKn3Wg',
+  'ip5/9': '1hLfZ0OJ5huE3OKg5w4wLvMLu5ImP2SDHdmtX89C7JJY',
+  'ip6/8': '14bjzUQ3tq_An3Ef5VSydZ84LrXueqk0oJF8HmUyihiI',
+  'ip6/9': '1iY1_YWHFvFDtvwz5FyWJtbnKCq8ixSIjGpysJ1LSg7Y'
+};
 
-function getTargetSpreadsheet() {
-  return SpreadsheetApp.openById(TARGET_SPREADSHEET_ID);
+var ALLOWED_CLASS_CODES = ['IP5/8', 'IP5/9', 'IP6/8', 'IP6/9'];
+
+// Backward-compatible aliases for older helper code. These are not fallbacks.
+var ALLOWED_SPREADSHEETS = CLASS_SPREADSHEET_IDS;
+var TEACHER_SPREADSHEET_IDS = CLASS_SPREADSHEET_IDS;
+var DEFAULT_SPREADSHEET_ID = '';
+var TARGET_SPREADSHEET_ID = '';
+
+function getAllowedSpreadsheetIds() {
+  return [
+    CLASS_SPREADSHEET_IDS['ip5/8'],
+    CLASS_SPREADSHEET_IDS['ip5/9'],
+    CLASS_SPREADSHEET_IDS['ip6/8'],
+    CLASS_SPREADSHEET_IDS['ip6/9']
+  ];
+}
+
+function isAllowedSpreadsheetId(spreadsheetId) {
+  var key;
+
+  for (key in ALLOWED_SPREADSHEETS) {
+    if (Object.prototype.hasOwnProperty.call(ALLOWED_SPREADSHEETS, key)) {
+      if (String(ALLOWED_SPREADSHEETS[key]) === String(spreadsheetId)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function resolveTargetSpreadsheetId(data, e) {
+  var rawClassCode = '';
+  var classCode = '';
+
+  data = data || {};
+
+  if (data.teacherKey) {
+    rawClassCode = data.teacherKey;
+  } else if (data.class) {
+    rawClassCode = data.class;
+  } else if (data.teacher) {
+    rawClassCode = data.teacher;
+  } else if (data.t) {
+    rawClassCode = data.t;
+  } else if (e && e.parameter && e.parameter.t) {
+    rawClassCode = e.parameter.t;
+  } else if (e && e.parameter && e.parameter.teacherKey) {
+    rawClassCode = e.parameter.teacherKey;
+  } else if (e && e.parameter && e.parameter.class) {
+    rawClassCode = e.parameter.class;
+  }
+
+  rawClassCode = String(rawClassCode || '').trim();
+  classCode = normalizeKey(rawClassCode);
+
+  if (!classCode) {
+    throw new Error('Missing class code. Upload cancelled. Open FactFlow with ?t=IP5/8, ?t=IP5/9, ?t=IP6/8, or ?t=IP6/9.');
+  }
+
+  if (!TEACHER_SPREADSHEET_IDS[classCode]) {
+    throw new Error('Unknown class code "' + rawClassCode + '". Upload cancelled.');
+  }
+
+  return TEACHER_SPREADSHEET_IDS[classCode];
+}
+
+function assertExpectedSpreadsheetId(data, spreadsheetId) {
+  var expected = String(data && data.expectedSpreadsheetId ? data.expectedSpreadsheetId : '').trim();
+  var classCode = String(data && (data.teacherKey || data.class || data.teacher || data.t) ? (data.teacherKey || data.class || data.teacher || data.t) : '').trim();
+
+  if (expected && String(expected) !== String(spreadsheetId)) {
+    throw new Error('Spreadsheet mismatch for class code "' + classCode + '". Expected ' + expected + ' but receiver resolved ' + spreadsheetId + '. Upload cancelled.');
+  }
+}
+
+function getTargetSpreadsheet(data, e) {
+  return SpreadsheetApp.openById(resolveTargetSpreadsheetId(data, e));
 }
 
 function normalizeName(name) {
@@ -47,9 +135,9 @@ function doPost(e) {
   try {
     var data = readJsonPayload(e);
     if (data && data.app === 'FactFlowPractice') {
-      return handleFactFlowPractice(data);
+      return handleFactFlowPractice(data, e);
     }
-    return handleFactFlowCheck(data);
+    return handleFactFlowCheck(data, e);
   } catch (err) {
     return json({ ok: false, error: err && err.message ? err.message : String(err) });
   }
@@ -64,8 +152,8 @@ function doPost(e) {
 //   2. 'FactFlow'         -> 'FactFlow Practice'
 //   3. 'Summary'          -> 'Check'
 // -----------------------------------------------------------------------------
-function migrateTabs() {
-  var ss = getTargetSpreadsheet();
+function migrateTabs(classCode) {
+  var ss = getTargetSpreadsheet({ teacherKey: classCode }, null);
   var log = [];
   var pairs = [
     ['Practice Summary', 'FactFlow Practice'],
@@ -100,22 +188,40 @@ function migrateTabs() {
   return log;
 }
 
-function doGet() {
+function doGet(e) {
+  var spreadsheetId;
+
+  try {
+    spreadsheetId = resolveTargetSpreadsheetId({}, e);
+  } catch (err) {
+    return json({
+      ok: false,
+      receiver: 'factflow-combined-v1',
+      status: 'Receiver is online, but no valid class route was provided.',
+      error: err && err.message ? err.message : String(err),
+      allowedSpreadsheetIds: getAllowedSpreadsheetIds(),
+      allowedClassCodes: ALLOWED_CLASS_CODES
+    });
+  }
+
   return json({
     ok: true,
     receiver: 'factflow-combined-v1',
     status: 'Receiver is online.',
-    spreadsheetId: TARGET_SPREADSHEET_ID
+    spreadsheetId: spreadsheetId,
+    allowedSpreadsheetIds: getAllowedSpreadsheetIds(),
+    allowedClassCodes: ALLOWED_CLASS_CODES
   });
 }
 
 // -----------------------------------------------------------------------------
 // Manual diagnostic helper.
 // Run this from Apps Script if you want to prove the script is writing to the
-// correct spreadsheet.
+// correct class spreadsheet. Example: writeDiagnosticStamp('IP5/9')
 // -----------------------------------------------------------------------------
-function writeDiagnosticStamp() {
-  var ss = getTargetSpreadsheet();
+function writeDiagnosticStamp(classCode) {
+  var spreadsheetId = resolveTargetSpreadsheetId({ teacherKey: classCode }, null);
+  var ss = SpreadsheetApp.openById(spreadsheetId);
   var sheet = ss.getSheetByName('Script Diagnostic');
 
   if (!sheet) {
@@ -125,11 +231,11 @@ function writeDiagnosticStamp() {
   sheet.getRange('A1').setValue('Script wrote here at:');
   sheet.getRange('B1').setValue(new Date());
   sheet.getRange('A2').setValue('Spreadsheet ID:');
-  sheet.getRange('B2').setValue(TARGET_SPREADSHEET_ID);
+  sheet.getRange('B2').setValue(spreadsheetId);
 
   SpreadsheetApp.flush();
 
-  return 'Wrote diagnostic stamp to spreadsheet ID ' + TARGET_SPREADSHEET_ID;
+  return 'Wrote diagnostic stamp to spreadsheet ID ' + spreadsheetId;
 }
 
 // -----------------------------------------------------------------------------
@@ -396,7 +502,7 @@ function upsertPracticeSummary(summary, rawSheet, data) {
   }
 }
 
-function handleFactFlowPractice(data) {
+function handleFactFlowPractice(data, e) {
   var lock = null;
 
   try {
@@ -411,7 +517,9 @@ function handleFactFlowPractice(data) {
     lock = LockService.getScriptLock();
     lock.waitLock(10000);
 
-    var ss = getTargetSpreadsheet();
+    var spreadsheetId = resolveTargetSpreadsheetId(data, e);
+    assertExpectedSpreadsheetId(data, spreadsheetId);
+    var ss = SpreadsheetApp.openById(spreadsheetId);
     var rawSheet = ensurePracticeRawSheet(ss);
     var summary = ensurePracticeSummarySheet(ss);
 
@@ -428,14 +536,16 @@ function handleFactFlowPractice(data) {
       receiver: 'factflow-practice-v1',
       student: normalizeName(data.studentName),
       roundId: data.roundId,
-      spreadsheetId: TARGET_SPREADSHEET_ID
+      spreadsheetId: spreadsheetId,
+      classCode: data.teacherKey || data.class || data.teacher || data.t || ''
     });
   } catch (err) {
     return json({
       ok: false,
       receiver: 'factflow-practice-v1',
       error: err && err.message ? err.message : String(err),
-      spreadsheetId: TARGET_SPREADSHEET_ID
+      spreadsheetId: spreadsheetId,
+      classCode: data.teacherKey || data.class || data.teacher || data.t || ''
     });
   } finally {
     if (lock) {
@@ -555,7 +665,7 @@ function upsertCheckSummary(summary, data, studentName) {
   }
 }
 
-function handleFactFlowCheck(data) {
+function handleFactFlowCheck(data, e) {
   var lock = null;
 
   try {
@@ -564,7 +674,9 @@ function handleFactFlowCheck(data) {
     lock = LockService.getScriptLock();
     lock.waitLock(10000);
 
-    var ss = getTargetSpreadsheet();
+    var spreadsheetId = resolveTargetSpreadsheetId(data, e);
+    assertExpectedSpreadsheetId(data, spreadsheetId);
+    var ss = SpreadsheetApp.openById(spreadsheetId);
     var rawSheet = ensureCheckRawSheet(ss);
     var summary = ensureCheckSummarySheet(ss);
 
@@ -577,14 +689,14 @@ function handleFactFlowCheck(data) {
       ok: true,
       receiver: 'factflow-check-v1',
       student: studentName,
-      spreadsheetId: TARGET_SPREADSHEET_ID
+      spreadsheetId: spreadsheetId
     });
   } catch (err) {
     return json({
       ok: false,
       receiver: 'factflow-check-v1',
       error: err && err.message ? err.message : String(err),
-      spreadsheetId: TARGET_SPREADSHEET_ID
+      spreadsheetId: spreadsheetId
     });
   } finally {
     if (lock) {
