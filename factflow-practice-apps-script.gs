@@ -82,7 +82,7 @@ function resolveTargetSpreadsheetId(data, e) {
   }
 
   rawClassCode = String(rawClassCode || '').trim();
-  classCode = normalizeKey(rawClassCode);
+  classCode = normalizeKey(rawClassCode).replace(/\s+/g, '').replace(/\\/g, '/');
 
   if (!classCode) {
     throw new Error('Missing class code. Upload cancelled. Open FactFlow with ?t=IP5/8, ?t=IP5/9, ?t=IP6/8, or ?t=IP6/9.');
@@ -299,13 +299,21 @@ function ensureSheet(ss, name, headers, hidden, legacyNames) {
 
   if (!sheet) {
     sheet = ss.insertSheet(name);
-    sheet.appendRow(headers);
-    if (hidden) {
-      sheet.hideSheet();
-    }
   }
-
+  ensureMinimumColumns(sheet, headers.length);
+  var headerRow = sheet.getRange(1, 1, 1, headers.length);
+  if (headerRow.getValues()[0].every(function (cell) { return String(cell || '').trim() === ''; })) {
+    headerRow.setValues([headers]);
+  }
+  if (hidden) {
+    try { sheet.hideSheet(); } catch (err) { Logger.log('Could not hide ' + name + ': ' + err.message); }
+  }
   return sheet;
+}
+
+function ensureMinimumColumns(sheet, count) {
+  var current = sheet.getMaxColumns();
+  if (current < count) sheet.insertColumnsAfter(current, count - current);
 }
 
 // -----------------------------------------------------------------------------
@@ -597,6 +605,7 @@ function ensureCheckRawSheet(ss) {
     'Timestamp', 'Student', 'Code', 'Assessment', 'Verified', 'Needs Practice',
     'Accuracy %', 'Fluent', 'Slow', 'Wrong', 'Timeout', 'Questions', 'Missed Facts', 'Duration sec'
   ], true);
+  ensureMinimumColumns(sheet, 16);
   sheet.getRange(1, 15, 1, 2).setValues([['Assessment ID', 'Assessment JSON']]);
   return sheet;
 }
@@ -606,6 +615,7 @@ function ensureCheckSummarySheet(ss) {
     'Student', 'Date', 'Code', 'Verified', 'Needs Practice',
     'Accuracy %', 'Fluent', 'Slow', 'Missed', 'Facts to Review'
   ], false, 'Summary');
+  ensureMinimumColumns(sheet, 14);
   sheet.getRange(1, 11, 1, 4).setValues([['Assessment ID', 'Incomplete Bands', 'Not Assessed Bands', 'Ended Because']]);
   return sheet;
 }

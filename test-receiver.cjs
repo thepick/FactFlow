@@ -8,12 +8,12 @@ const posted = {app:'FactFlowCheck',schemaVersion:2,assessmentId:'ffc-test-1',te
   let locked=false, flushes=0, failFlush=false, failSummary=false;
   const sheets=new Map();
   class Sheet {
-    constructor(name){this.name=name;this.rows=[];}
+    constructor(name){this.name=name;this.rows=[];this.columns=10;} getMaxColumns(){return this.columns;} insertColumnsAfter(at,count){this.columns+=count;}
     getName(){return this.name;} setName(name){sheets.delete(this.name);this.name=name;sheets.set(name,this);return this;}
     hideSheet(){} getLastRow(){return this.rows.length;} getLastColumn(){return Math.max(0,...this.rows.map(r=>r.length));}
     appendRow(row){assert.ok(locked);this.rows.push(row.slice());}
     getDataRange(){return {getValues:()=>this.rows.map(r=>r.slice())};}
-    getRange(row,col,n=1,m=1){return {
+    getRange(row,col,n=1,m=1){assert.ok(col+m-1<=this.columns);return {
       getValues:()=>Array.from({length:n},(_,i)=>Array.from({length:m},(_,j)=>this.rows[row+i-1]?.[col+j-1]??'')),
       getValue:()=>this.rows[row-1]?.[col-1]??'',
       setValues:values=>{assert.ok(locked);if(failSummary&&this.name==='Check'&&row>1)throw Error('Summary unavailable');for(let i=0;i<n;i++){this.rows[row+i-1]??=[];for(let j=0;j<m;j++)this.rows[row+i-1][col+j-1]=values[i][j];}},
