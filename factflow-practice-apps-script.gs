@@ -696,8 +696,8 @@ function teacherGradeCells(data) {
 }
 
 function formatTeacherGrade(summary, row) {
-  summary.getRange(row,23,1,1).setNumberFormat('0.0%');
-  summary.getRange(row,25,1,2).setNumberFormat('0.0%');
+  summary.getRange(row,23,1,1).setNumberFormat('0%');
+  summary.getRange(row,25,1,2).setNumberFormat('0%');
 }
 
 // Editor-only maintenance. Updates grade columns for current schema-3 snapshots,
