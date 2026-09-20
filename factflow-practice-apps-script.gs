@@ -17,7 +17,7 @@
 //
 // There is deliberately NO fallback spreadsheet. If a submission does not include
 // a valid class code, the upload is rejected before any sheet is opened or written.
-var BUILD_VERSION = 'factflow-combined-v3-assessment-receipts';
+var BUILD_VERSION = 'factflow-combined-v4-fact-groups';
 
 var CLASS_SPREADSHEET_IDS = {
   'ip5/8': '1VYs2dbduN8s5R3YEoOzIqQO2fnHko0YQypd3MYKn3Wg',
@@ -600,8 +600,8 @@ function handleFactFlowPractice(data, e) {
 // Hidden check log tab: Raw Data
 // -----------------------------------------------------------------------------
 // Append metadata columns without moving or deleting existing results.
-function ensureCheckRawSheet(ss) {
-  var sheet = ensureSheet(ss, 'Raw Data', [
+function ensureCheckRawSheet(ss, modern) {
+  var sheet = ensureSheet(ss, modern ? 'Check Raw v3' : 'Raw Data', [
     'Timestamp', 'Student', 'Code', 'Assessment', 'Verified', 'Needs Practice',
     'Accuracy %', 'Fluent', 'Slow', 'Wrong', 'Timeout', 'Questions', 'Missed Facts', 'Duration sec'
   ], true);
@@ -610,13 +610,18 @@ function ensureCheckRawSheet(ss) {
   return sheet;
 }
 
-function ensureCheckSummarySheet(ss) {
-  var sheet = ensureSheet(ss, 'Check', [
+function ensureCheckSummarySheet(ss, modern) {
+  var sheet = ensureSheet(ss, modern ? 'Check v3' : 'Check', [
     'Student', 'Date', 'Code', 'Verified', 'Needs Practice',
     'Accuracy %', 'Fluent', 'Slow', 'Missed', 'Facts to Review'
-  ], false, 'Summary');
-  ensureMinimumColumns(sheet, 14);
+  ], false, modern ? [] : 'Summary');
+  ensureMinimumColumns(sheet, modern ? 22 : 14);
   sheet.getRange(1, 11, 1, 4).setValues([['Assessment ID', 'Incomplete Bands', 'Not Assessed Bands', 'Ended Because']]);
+  if(modern) {
+    sheet.getRange(1,4,1,2).setValues([['Fluent Recall','Areas Needing Attention']]);
+    sheet.getRange(1,12,1,2).setValues([['Incomplete Groups','Not Assessed Groups']]);
+    sheet.getRange(1,15,1,8).setValues([['Version','Response Conditions','Input Method','Accuracy Only Groups','Fluency Developing Groups','Incorrect / Unanswered / Skipped','Started','Pauses / Interruptions']]);
+  }
   return sheet;
 }
 
@@ -637,21 +642,40 @@ function validateCheck(data) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid assessment.');
   if (typeof data.studentName !== 'string' || !data.studentName.trim() || data.studentName.length > 100) throw new Error('Missing or invalid student name.');
   if (typeof data.completedAt !== 'string' || !isFinite(Date.parse(data.completedAt))) throw new Error('Invalid completion date.');
+  var modern=data.schemaVersion===3;
+  var limit=modern?98:60;
   ['totalQuestions', 'correct', 'fluent', 'slow', 'wrong', 'timeout', 'accuracy'].forEach(function (key) {
     var value = data[key];
-    if (!Number.isInteger(value) || value < 0 || value > (key === 'accuracy' ? 100 : 60)) throw new Error('Invalid ' + key + '.');
+    if (!Number.isInteger(value) || value < 0 || value > (key === 'accuracy' ? 100 : limit)) throw new Error('Invalid ' + key + '.');
   });
-  if (data.correct + data.wrong + data.timeout !== data.totalQuestions || data.fluent + data.slow !== data.correct) throw new Error('Inconsistent assessment totals.');
-  if (!Array.isArray(data.missedFacts) || data.missedFacts.length > 60 || data.missedFacts.some(function (fact) { return typeof fact !== 'string' || fact.length > 30; })) throw new Error('Invalid missed facts.');
-  if (data.app === 'FactFlowCheck' && (data.schemaVersion !== 2 || typeof data.assessmentId !== 'string' || !/^ffc-[a-zA-Z0-9-]{1,100}$/.test(data.assessmentId))) throw new Error('Missing or invalid assessment ID/version.');
-  if (JSON.stringify(data).length > 45000) throw new Error('Assessment is too large.');
+  if(modern&&(!Number.isInteger(data.skipped)||data.skipped<0||data.skipped>limit))throw new Error('Invalid skipped count.');
+  if (data.correct + data.wrong + data.timeout + (modern?data.skipped:0) !== data.totalQuestions || data.fluent + data.slow !== data.correct) throw new Error('Inconsistent assessment totals.');
+  if (!Array.isArray(data.missedFacts) || data.missedFacts.length > limit || data.missedFacts.some(function (fact) { return typeof fact !== 'string' || fact.length > 30; })) throw new Error('Invalid missed facts.');
+  if (data.app === 'FactFlowCheck' && ([2,3].indexOf(data.schemaVersion)<0 || typeof data.assessmentId !== 'string' || !/^ffc-[a-zA-Z0-9-]{1,100}$/.test(data.assessmentId))) throw new Error('Missing or invalid assessment ID/version.');
+  if (JSON.stringify(data).length > (modern?48000:45000)) throw new Error('Assessment is too large.');
   if (data.bandResults && (!Array.isArray(data.bandResults) || data.bandResults.length > 8 || data.bandResults.some(function (band) {
-    return !band || !/^[A-H]$/.test(band.bandId) || ['pass', 'fail', 'incomplete', 'not_assessed'].indexOf(band.verdict) < 0;
+    return !band || !/^[A-H]$/.test(band.bandId) || (modern?['pass','slow','accuracy_only','fail','incomplete','not_assessed']:['pass','fail','incomplete','not_assessed']).indexOf(band.verdict) < 0;
   }))) throw new Error('Invalid band evidence.');
+  if(modern) {
+    var c=data.conditions;
+    if(data.app!=='FactFlowCheck'||!c||['standard','extended','untimed'].indexOf(c.mode)<0||['student','teacher'].indexOf(c.input)<0||typeof c.mixed!=='boolean'||typeof c.hideTimer!=='boolean')throw new Error('Invalid assessment conditions.');
+    if(!Array.isArray(data.bandResults)||data.bandResults.length!==8||new Set(data.bandResults.map(function(b){return b.bandId;})).size!==8)throw new Error('Missing group evidence.');
+    var totals={questions:0,correct:0,fluent:0,slow:0,wrong:0,timeout:0,skipped:0};
+    data.bandResults.forEach(function(b){
+      Object.keys(totals).forEach(function(k){if(!Number.isInteger(b[k])||b[k]<0||b[k]>(b.bandId==='H'?18:['C','D','E','F'].indexOf(b.bandId)>=0?11:12))throw new Error('Invalid group count.');totals[k]+=b[k];});
+      if(b.correct+b.wrong+b.timeout+b.skipped!==b.questions||b.fluent+b.slow!==b.correct)throw new Error('Inconsistent group evidence.');
+      if((c.mode!=='standard'||c.input!=='student')&&(b.fluent!==0||b.verdict==='pass'||b.verdict==='slow'))throw new Error('Accommodated check cannot claim standard fluency.');
+      if(typeof b.label!=='string'||b.label.length>60||!Array.isArray(b.tables)||b.tables.some(function(t){return !Number.isInteger(t)||t<2||t>12;}))throw new Error('Invalid group label/coverage.');
+    });
+    if(totals.questions!==data.totalQuestions)throw new Error('Inconsistent group totals.');
+    ['correct','fluent','slow','wrong','timeout','skipped'].forEach(function(k){if(totals[k]!==data[k])throw new Error('Inconsistent '+k+' totals.');});
+    if(!Array.isArray(data.questionResults)||data.questionResults.length!==data.totalQuestions||!Array.isArray(data.breaks)||!Array.isArray(data.interruptions))throw new Error('Missing assessment evidence.');
+    if(data.accuracy!==(data.totalQuestions?Math.round(data.correct/data.totalQuestions*100):0))throw new Error('Inconsistent accuracy.');
+  }
 }
 
 function checkBandsWithVerdict(data, verdict) {
-  return (data.bandResults || []).filter(function (band) { return band.verdict === verdict; }).map(function (band) { return band.bandId; }).join(', ');
+  return (data.bandResults || []).filter(function (band) { return band.verdict === verdict; }).map(function (band) { return data.schemaVersion===3 ? band.label : band.bandId; }).join(', ');
 }
 
 function appendCheckRaw(rawSheet, data, studentName) {
@@ -672,6 +696,9 @@ function upsertCheckSummary(summary, data, studentName) {
     data.wrong + data.timeout, data.missedFacts.join(', '), data.assessmentId,
     checkBandsWithVerdict(data, 'incomplete'), checkBandsWithVerdict(data, 'not_assessed'), data.finalReason || ''
   ].map(checkCell);
+  if(data.schemaVersion===3)values=values.concat([data.appVersion,data.conditions.mode,data.conditions.input,
+    checkBandsWithVerdict(data,'accuracy_only'),checkBandsWithVerdict(data,'slow'),data.wrong+' / '+data.timeout+' / '+data.skipped,
+    data.startedAt,data.breaks.length+' / '+data.interruptions.length].map(checkCell));
   if (row > 0) summary.getRange(row, 1, 1, values.length).setValues([values]);
   else summary.appendRow(values);
   safeSortRange(summary, 2, 1, summary.getLastRow() - 1, summary.getLastColumn(), 1, true);
@@ -689,8 +716,8 @@ function handleFactFlowCheck(data, e) {
     lock = LockService.getScriptLock();
     lock.waitLock(10000);
     var ss = SpreadsheetApp.openById(spreadsheetId);
-    var rawSheet = ensureCheckRawSheet(ss);
-    var summary = ensureCheckSummarySheet(ss);
+    var rawSheet = ensureCheckRawSheet(ss,data.schemaVersion===3);
+    var summary = ensureCheckSummarySheet(ss,data.schemaVersion===3);
     var count = rawSheet.getLastRow() - 1;
     var existing = count > 0 ? rawSheet.getRange(2, 15, count, 2).getValues() : [];
     var stored = null;
