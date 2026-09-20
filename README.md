@@ -327,6 +327,6 @@ Students should not practice on two devices at the same time using the same Goog
 The favicon and Apple touch icon PNG files should stay in the same folder as `index.html`. If the celebration video has been extracted, keep `celebration.mp4` beside `index.html` as well.
 
 
-## Fact group assessment preview (schema 3)
+## Fact group assessments (schema 3)
 
-The proposed combined receiver also accepts independent fact-group snapshots in schema 3. These use separate Check v3 and Check Raw v3 tabs, retaining conditions, version, coverage and complete evidence. Legacy assessment and practice paths remain unchanged. The corresponding Check 3.0 preview is local-only; deploy this receiver before a later approved production promotion, not as a prerequisite for the pilot.
+The combined receiver also accepts independent fact-group snapshots in schema 3. These use separate Check v3 and Check Raw v3 tabs, retaining conditions, version, coverage and complete evidence. Legacy assessment and practice paths remain unchanged. Deploy this receiver before publishing Check 3.0. The separate Check preview remains local-only.
