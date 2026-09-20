@@ -1,4 +1,4 @@
-// FactFlow / FactFlow Check - combined Google Sheets receiver
+// FactFlow / FactFlow Quiz - combined Google Sheets receiver
 // Paste this entire file into Extensions > Apps Script in the target Google Sheet.
 // Deploy as Web App:
 //   Execute as: Me
@@ -595,7 +595,7 @@ function handleFactFlowPractice(data, e) {
 }
 
 // -----------------------------------------------------------------------------
-// FactFlow Check receiver
+// FactFlow Quiz receiver
 // Visible check summary tab: Check
 // Hidden check log tab: Raw Data
 // -----------------------------------------------------------------------------

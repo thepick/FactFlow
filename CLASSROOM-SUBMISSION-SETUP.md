@@ -2,7 +2,7 @@
 
 ## Shared receiver upgrade for independent assessments
 
-The receiver now matches FactFlow Check 2.8.0. Deploy this receiver (or the identical copy in FactFlow Check) before updating Check. Keep the existing Web App deployment URL by using Manage deployments → Edit → New version → Deploy.
+The receiver now matches FactFlow Quiz 2.8.0. Deploy this receiver (or the identical copy in FactFlow Quiz) before updating Quiz. Keep the existing Web App deployment URL by using Manage deployments → Edit → New version → Deploy.
 
 Check results receive an assessment ID, a verified spreadsheet receipt, retry deduplication, and protection against older retries replacing newer snapshots. The Check and Raw Data tabs remain separate from FactFlow Practice and Practice Raw Data. FactFlow's practice app and progress are unchanged: there is no placement import or transfer of assessment results into practice mastery.
 
@@ -23,7 +23,7 @@ For final production, the same rules apply on `https://factflow.mtomlinson.ca`.
 
 ## What has already been filled in
 
-The `TEACHERS` map in `index.html` now contains the existing class Apps Script Web App URLs from the FactFlow Check app:
+The `TEACHERS` map in `index.html` now contains the existing class Apps Script Web App URLs from the FactFlow Quiz app:
 
 ```javascript
 var TEACHERS = {
@@ -46,7 +46,7 @@ var TEACHERS = {
 };
 ```
 
-Important: those URLs are filled in, but the Google Apps Script projects behind those URLs still need to use the combined receiver included in this project. If the old FactFlow Check-only receiver is still deployed, the app will now fail closed: it checks the receiver first and will not send practice data unless the receiver reports `factflow-combined-v1`.
+Important: those URLs are filled in, but the Google Apps Script projects behind those URLs still need to use the combined receiver included in this project. If the old FactFlow Quiz-only receiver is still deployed, the app will now fail closed: it checks the receiver first and will not send practice data unless the receiver reports `factflow-combined-v1`.
 
 ## Required Google Apps Script update
 
@@ -62,7 +62,7 @@ For each class spreadsheet/script project:
 6. Confirm the Web App URL still matches the URL in the `TEACHERS` map.
 7. If Google gives you a new Web App URL, paste the new URL into the matching `TEACHERS` entry in `index.html` and redeploy/upload FactFlow again.
 
-The included Apps Script is designed to preserve the existing FactFlow Check behavior while adding separate practice tabs for the regular FactFlow practice app. The FactFlow practice app performs a safety check before POSTing practice data, so the combined receiver must be deployed before classroom practice submissions can be accepted.
+The included Apps Script is designed to preserve the existing FactFlow Quiz behavior while adding separate practice tabs for the regular FactFlow practice app. The FactFlow practice app performs a safety check before POSTing practice data, so the combined receiver must be deployed before classroom practice submissions can be accepted.
 
 ## Required Google OAuth check
 
@@ -114,7 +114,7 @@ The Apps Script creates separate practice tabs:
 - `Practice Raw Data`: one row per completed round
 - `FactFlow Practice`: one row per student, updated after each completed practice round
 
-The same script still preserves the existing FactFlow Check behavior using the original `Raw Data` tab and the `Check` summary tab.
+The same script still preserves the existing FactFlow Quiz behavior using the original `Raw Data` tab and the `Check` summary tab.
 
 ## Suggested test links
 

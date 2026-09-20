@@ -71,7 +71,7 @@ The Google Sheet receiver creates separate practice tabs:
 - `Practice Raw Data`: one row per completed practice round
 - `FactFlow Practice`: one row per student, updated after each submitted practice round
 
-The included Apps Script receiver also preserves the existing FactFlow Check tabs and behavior:
+The included Apps Script receiver also preserves the existing FactFlow Quiz tabs and behavior:
 
 - `Raw Data`
 - `Check`
@@ -281,7 +281,7 @@ FactFlow includes classroom submission support and a combined Google Apps Script
 Important files:
 
 - `index.html`: the FactFlow practice app
-- `factflow-practice-apps-script.gs`: combined Google Sheets receiver for FactFlow practice submissions and existing FactFlow Check submissions
+- `factflow-practice-apps-script.gs`: combined Google Sheets receiver for FactFlow practice submissions and existing FactFlow Quiz submissions
 - `CLASSROOM-SUBMISSION-SETUP.md`: detailed setup and testing checklist
 - `CNAME`: set for `factflow.mtomlinson.ca`
 
@@ -312,7 +312,7 @@ var TEACHERS = {
 
 If Google creates a new Web App URL when you redeploy the Apps Script, update the matching `url` value in `index.html` before uploading the app.
 
-The practice app checks the receiver before sending practice data. If the old FactFlow Check-only receiver is still deployed, the app will fail closed and show that the receiver needs updating instead of sending practice data to the wrong sheet structure.
+The practice app checks the receiver before sending practice data. If the old FactFlow Quiz-only receiver is still deployed, the app will fail closed and show that the receiver needs updating instead of sending practice data to the wrong sheet structure.
 
 ## Teacher settings
 
@@ -329,6 +329,6 @@ The favicon and Apple touch icon PNG files should stay in the same folder as `in
 
 ## Fact group assessments (schema 3)
 
-The combined receiver also accepts independent fact-group snapshots in schema 3. These use separate Check v3 and Check Raw v3 tabs, retaining conditions, version, coverage and complete evidence. Legacy assessment and practice paths remain unchanged. Deploy this receiver before publishing Check 3.0. The separate Check preview remains local-only.
+The combined receiver also accepts independent fact-group snapshots in schema 3. These use separate Check v3 and Check Raw v3 tabs, retaining conditions, version, coverage and complete evidence. Legacy assessment and practice paths remain unchanged. Deploy this receiver before publishing Quiz 3.0. The separate Quiz preview remains local-only.
 
 Check v3 includes a receiver-only teacher grade: eight equally weighted levels, each scored with 60% accuracy and 40% standard fluent recall. Incomplete routes remain ungraded; accommodated assessments show accuracy only. Run refreshTeacherGrades in the script editor after rollout to populate existing IP5/8 and IP5/9 grade columns. Student reports and practice logic are unchanged.
