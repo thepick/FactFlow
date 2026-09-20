@@ -330,3 +330,5 @@ The favicon and Apple touch icon PNG files should stay in the same folder as `in
 ## Fact group assessments (schema 3)
 
 The combined receiver also accepts independent fact-group snapshots in schema 3. These use separate Check v3 and Check Raw v3 tabs, retaining conditions, version, coverage and complete evidence. Legacy assessment and practice paths remain unchanged. Deploy this receiver before publishing Check 3.0. The separate Check preview remains local-only.
+
+Check v3 includes a receiver-only teacher grade: eight equally weighted levels, each scored with 60% accuracy and 40% standard fluent recall. Incomplete routes remain ungraded; accommodated assessments show accuracy only. Run refreshTeacherGrades in the script editor after rollout to populate existing IP5/8 and IP5/9 grade columns. Student reports and practice logic are unchanged.

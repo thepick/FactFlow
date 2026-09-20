@@ -17,7 +17,7 @@
 //
 // There is deliberately NO fallback spreadsheet. If a submission does not include
 // a valid class code, the upload is rejected before any sheet is opened or written.
-var BUILD_VERSION = 'factflow-combined-v4-fact-groups';
+var BUILD_VERSION = 'factflow-combined-v5-teacher-grade';
 
 var CLASS_SPREADSHEET_IDS = {
   'ip5/8': '1VYs2dbduN8s5R3YEoOzIqQO2fnHko0YQypd3MYKn3Wg',
@@ -615,12 +615,13 @@ function ensureCheckSummarySheet(ss, modern) {
     'Student', 'Date', 'Code', 'Verified', 'Needs Practice',
     'Accuracy %', 'Fluent', 'Slow', 'Missed', 'Facts to Review'
   ], false, modern ? [] : 'Summary');
-  ensureMinimumColumns(sheet, modern ? 22 : 14);
+  ensureMinimumColumns(sheet, modern ? 26 : 14);
   sheet.getRange(1, 11, 1, 4).setValues([['Assessment ID', 'Incomplete Bands', 'Not Assessed Bands', 'Ended Because']]);
   if(modern) {
     sheet.getRange(1,4,1,2).setValues([['Fluent Recall','Areas Needing Attention']]);
     sheet.getRange(1,12,1,2).setValues([['Incomplete Groups','Not Assessed Groups']]);
     sheet.getRange(1,15,1,8).setValues([['Version','Response Conditions','Input Method','Accuracy Only Groups','Fluency Developing Groups','Incorrect / Unanswered / Skipped','Started','Pauses / Interruptions']]);
+    sheet.getRange(1,23,1,4).setValues([['Teacher Grade %','Grade Basis','Level-weighted Accuracy %','Level-weighted Fluency %']]);
   }
   return sheet;
 }
@@ -678,6 +679,56 @@ function checkBandsWithVerdict(data, verdict) {
   return (data.bandResults || []).filter(function (band) { return band.verdict === verdict; }).map(function (band) { return data.schemaVersion===3 ? band.label : band.bandId; }).join(', ');
 }
 
+// Receiver-only grade: never included in the student payload or delivery receipt.
+function teacherGradeCells(data) {
+  var basis = 'v1: eight equal levels; 60% accuracy + 40% fluency';
+  var bands = data.bandResults || [];
+  var complete = data.schemaVersion === 3 && data.finalReason === 'Completed the selected fact groups.' &&
+    bands.length === 8 && new Set(bands.map(function(b){return b.bandId;})).size === 8 &&
+    bands.every(function(b){return /^[A-H]$/.test(b.bandId) && b.questions >= (b.bandId === 'H' ? 18 : b.verdict === 'fail' ? 6 : 8);});
+  if(!complete) return ['', 'Not graded: unfinished assessment', '', ''];
+  var accuracy = bands.reduce(function(sum,b){return sum+b.correct/b.questions;},0)/8;
+  var standard = data.conditions.mode === 'standard' && data.conditions.input === 'student';
+  if(!standard) return ['', 'Accuracy only: accommodated conditions; eight equal levels', accuracy, ''];
+  var fluency = bands.reduce(function(sum,b){return sum+b.fluent/b.questions;},0)/8;
+  if(data.skipped || data.timeout) basis += '; includes unanswered items as zero';
+  return [0.6*accuracy+0.4*fluency, basis, accuracy, fluency];
+}
+
+function formatTeacherGrade(summary, row) {
+  summary.getRange(row,23,1,1).setNumberFormat('0.0%');
+  summary.getRange(row,25,1,2).setNumberFormat('0.0%');
+}
+
+// Editor-only maintenance. Updates grade columns for current schema-3 snapshots,
+// matched by assessment ID; historical evidence and student verdicts stay intact.
+function refreshTeacherGrades() {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    ['ip5/8','ip5/9'].forEach(function(key){
+      var ss = SpreadsheetApp.openById(CLASS_SPREADSHEET_IDS[key]);
+      var summary = ensureCheckSummarySheet(ss,true);
+      var raw = ss.getSheetByName('Check Raw v3');
+      var records = {};
+      if(raw && raw.getLastRow()>1) raw.getRange(2,15,raw.getLastRow()-1,2).getValues().forEach(function(r){records[r[0]]=r[1];});
+      var rows = summary.getDataRange().getValues();
+      for(var i=1;i<rows.length;i++) {
+        var cells = ['', 'Not graded: saved evidence unavailable', '', ''];
+        if(records[rows[i][10]]) {
+          var data = JSON.parse(records[rows[i][10]]);
+          validateCheck(data);
+          cells = teacherGradeCells(data);
+        }
+        summary.getRange(i+1,23,1,4).setValues([cells]);
+        formatTeacherGrade(summary,i+1);
+      }
+      Logger.log(key + ': grade columns ready; ' + (rows.length-1) + ' current snapshots updated.');
+    });
+    safeFlush();
+  } finally { lock.releaseLock(); }
+}
+
 function appendCheckRaw(rawSheet, data, studentName) {
   rawSheet.appendRow([
     new Date(data.completedAt), studentName, data.code || '', data.assessmentName || '',
@@ -698,9 +749,10 @@ function upsertCheckSummary(summary, data, studentName) {
   ].map(checkCell);
   if(data.schemaVersion===3)values=values.concat([data.appVersion,data.conditions.mode,data.conditions.input,
     checkBandsWithVerdict(data,'accuracy_only'),checkBandsWithVerdict(data,'slow'),data.wrong+' / '+data.timeout+' / '+data.skipped,
-    data.startedAt,data.breaks.length+' / '+data.interruptions.length].map(checkCell));
+    data.startedAt,data.breaks.length+' / '+data.interruptions.length].map(checkCell)).concat(teacherGradeCells(data));
   if (row > 0) summary.getRange(row, 1, 1, values.length).setValues([values]);
-  else summary.appendRow(values);
+  else { summary.appendRow(values); row = summary.getLastRow(); }
+  if(data.schemaVersion===3)formatTeacherGrade(summary,row);
   safeSortRange(summary, 2, 1, summary.getLastRow() - 1, summary.getLastColumn(), 1, true);
 }
 
