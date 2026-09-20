@@ -1,5 +1,13 @@
 # FactFlow Classroom Submission Setup
 
+## Shared receiver upgrade for independent assessments
+
+The receiver now matches FactFlow Check 2.8.0. Deploy this receiver (or the identical copy in FactFlow Check) before updating Check. Keep the existing Web App deployment URL by using Manage deployments → Edit → New version → Deploy.
+
+Check results receive an assessment ID, a verified spreadsheet receipt, retry deduplication, and protection against older retries replacing newer snapshots. The Check and Raw Data tabs remain separate from FactFlow Practice and Practice Raw Data. FactFlow's practice app and progress are unchanged: there is no placement import or transfer of assessment results into practice mastery.
+
+Run `node test-receiver.cjs` for local receiver regression checks. A real deployment smoke test is still needed after publishing the Apps Script update.
+
 This patch adds classroom submission to the regular FactFlow practice app.
 
 ## URL behavior
