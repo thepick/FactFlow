@@ -17,7 +17,7 @@
 //
 // There is deliberately NO fallback spreadsheet. If a submission does not include
 // a valid class code, the upload is rejected before any sheet is opened or written.
-var BUILD_VERSION = 'factflow-combined-v5-teacher-grade';
+var BUILD_VERSION = 'factflow-combined-v6-quiz-tabs';
 
 var CLASS_SPREADSHEET_IDS = {
   'ip5/8': '1VYs2dbduN8s5R3YEoOzIqQO2fnHko0YQypd3MYKn3Wg',
@@ -601,20 +601,20 @@ function handleFactFlowPractice(data, e) {
 // -----------------------------------------------------------------------------
 // Append metadata columns without moving or deleting existing results.
 function ensureCheckRawSheet(ss, modern) {
-  var sheet = ensureSheet(ss, modern ? 'Check Raw v3' : 'Raw Data', [
+  var sheet = ensureSheet(ss, modern ? 'FactFlow Quiz Raw' : 'Raw Data', [
     'Timestamp', 'Student', 'Code', 'Assessment', 'Verified', 'Needs Practice',
     'Accuracy %', 'Fluent', 'Slow', 'Wrong', 'Timeout', 'Questions', 'Missed Facts', 'Duration sec'
-  ], true);
+  ], true, modern ? ['Check Raw v3'] : []);
   ensureMinimumColumns(sheet, 16);
   sheet.getRange(1, 15, 1, 2).setValues([['Assessment ID', 'Assessment JSON']]);
   return sheet;
 }
 
 function ensureCheckSummarySheet(ss, modern) {
-  var sheet = ensureSheet(ss, modern ? 'Check v3' : 'Check', [
+  var sheet = ensureSheet(ss, modern ? 'FactFlow Quiz' : 'Check', [
     'Student', 'Date', 'Code', 'Verified', 'Needs Practice',
     'Accuracy %', 'Fluent', 'Slow', 'Missed', 'Facts to Review'
-  ], false, modern ? [] : 'Summary');
+  ], false, modern ? ['Check v3'] : 'Summary');
   ensureMinimumColumns(sheet, modern ? 26 : 14);
   sheet.getRange(1, 11, 1, 4).setValues([['Assessment ID', 'Incomplete Bands', 'Not Assessed Bands', 'Ended Because']]);
   if(modern) {
@@ -709,7 +709,7 @@ function refreshTeacherGrades() {
     ['ip5/8','ip5/9'].forEach(function(key){
       var ss = SpreadsheetApp.openById(CLASS_SPREADSHEET_IDS[key]);
       var summary = ensureCheckSummarySheet(ss,true);
-      var raw = ss.getSheetByName('Check Raw v3');
+      var raw = ss.getSheetByName('FactFlow Quiz Raw') || ss.getSheetByName('Check Raw v3');
       var records = {};
       if(raw && raw.getLastRow()>1) raw.getRange(2,15,raw.getLastRow()-1,2).getValues().forEach(function(r){records[r[0]]=r[1];});
       var rows = summary.getDataRange().getValues();
