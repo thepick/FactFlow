@@ -17,7 +17,7 @@
 //
 // There is deliberately NO fallback spreadsheet. If a submission does not include
 // a valid class code, the upload is rejected before any sheet is opened or written.
-var BUILD_VERSION = 'factflow-practice-v2-no-number-format';
+var BUILD_VERSION = 'factflow-combined-v3-assessment-receipts';
 
 var CLASS_SPREADSHEET_IDS = {
   'ip5/8': '1VYs2dbduN8s5R3YEoOzIqQO2fnHko0YQypd3MYKn3Wg',
@@ -65,6 +65,8 @@ function resolveTargetSpreadsheetId(data, e) {
 
   if (data.teacherKey) {
     rawClassCode = data.teacherKey;
+  } else if (data.classCode) {
+    rawClassCode = data.classCode;
   } else if (data.class) {
     rawClassCode = data.class;
   } else if (data.teacher) {
@@ -139,6 +141,7 @@ function doPost(e) {
     if (data && data.app === 'FactFlowPractice') {
       return handleFactFlowPractice(data, e);
     }
+    if (data && data.app && data.app !== 'FactFlowCheck') throw new Error('Unknown app.');
     return handleFactFlowCheck(data, e);
   } catch (err) {
     return json({ ok: false, error: err && err.message ? err.message : String(err) });
@@ -164,13 +167,8 @@ function safeSortRange(sheet, startRow, startCol, numRows, numCols, sortColumn, 
 }
 
 function safeFlush() {
-  try {
-    safeFlush();
-    return true;
-  } catch (err) {
-    Logger.log('safeFlush: flush failed after writes were requested. Error: ' + (err && err.message ? err.message : String(err)));
-    return false;
-  }
+  SpreadsheetApp.flush();
+  return true;
 }
 
 // -----------------------------------------------------------------------------
@@ -593,148 +591,113 @@ function handleFactFlowPractice(data, e) {
 // Visible check summary tab: Check
 // Hidden check log tab: Raw Data
 // -----------------------------------------------------------------------------
+// Append metadata columns without moving or deleting existing results.
 function ensureCheckRawSheet(ss) {
-  var rawSheet = ss.getSheetByName('Raw Data');
-
-  if (!rawSheet) {
-    rawSheet = ss.insertSheet('Raw Data');
-    rawSheet.appendRow([
-      'Timestamp',
-      'Student',
-      'Code',
-      'Assessment',
-      'Verified',
-      'Developing',
-      'Accuracy %',
-      'Fluent',
-      'Slow',
-      'Wrong',
-      'Timeout',
-      'Questions',
-      'Missed Facts',
-      'Duration sec'
-    ]);
-    rawSheet.hideSheet();
-  }
-
-  return rawSheet;
+  var sheet = ensureSheet(ss, 'Raw Data', [
+    'Timestamp', 'Student', 'Code', 'Assessment', 'Verified', 'Needs Practice',
+    'Accuracy %', 'Fluent', 'Slow', 'Wrong', 'Timeout', 'Questions', 'Missed Facts', 'Duration sec'
+  ], true);
+  sheet.getRange(1, 15, 1, 2).setValues([['Assessment ID', 'Assessment JSON']]);
+  return sheet;
 }
 
 function ensureCheckSummarySheet(ss) {
-  return ensureSheet(ss, 'Check', [
-    'Student',
-    'Date',
-    'Code',
-    'Verified',
-    'Developing',
-    'Accuracy %',
-    'Fluent',
-    'Slow',
-    'Missed',
-    'Facts to Review'
+  var sheet = ensureSheet(ss, 'Check', [
+    'Student', 'Date', 'Code', 'Verified', 'Needs Practice',
+    'Accuracy %', 'Fluent', 'Slow', 'Missed', 'Facts to Review'
   ], false, 'Summary');
+  sheet.getRange(1, 11, 1, 4).setValues([['Assessment ID', 'Incomplete Bands', 'Not Assessed Bands', 'Ended Because']]);
+  return sheet;
 }
 
 function findCheckSummaryRow(summary, studentName) {
-  var summaryData = summary.getDataRange().getValues();
-  var normalizedStudentName = normalizeName(studentName);
-  var i;
-
-  for (i = 1; i < summaryData.length; i += 1) {
-    if (normalizeName(summaryData[i][0]) === normalizedStudentName) {
-      return i + 1;
-    }
+  var values = summary.getDataRange().getValues();
+  for (var i = 1; i < values.length; i += 1) {
+    if (normalizeName(values[i][0]) === normalizeName(studentName)) return i + 1;
   }
-
   return -1;
+}
+
+function checkCell(value) {
+  // Names and other submitted text must remain literal cells, never formulas.
+  return typeof value === 'string' && /^[=+\-@\t\r]/.test(value) ? "'" + value : value;
+}
+
+function validateCheck(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid assessment.');
+  if (typeof data.studentName !== 'string' || !data.studentName.trim() || data.studentName.length > 100) throw new Error('Missing or invalid student name.');
+  if (typeof data.completedAt !== 'string' || !isFinite(Date.parse(data.completedAt))) throw new Error('Invalid completion date.');
+  ['totalQuestions', 'correct', 'fluent', 'slow', 'wrong', 'timeout', 'accuracy'].forEach(function (key) {
+    var value = data[key];
+    if (!Number.isInteger(value) || value < 0 || value > (key === 'accuracy' ? 100 : 60)) throw new Error('Invalid ' + key + '.');
+  });
+  if (data.correct + data.wrong + data.timeout !== data.totalQuestions || data.fluent + data.slow !== data.correct) throw new Error('Inconsistent assessment totals.');
+  if (!Array.isArray(data.missedFacts) || data.missedFacts.length > 60 || data.missedFacts.some(function (fact) { return typeof fact !== 'string' || fact.length > 30; })) throw new Error('Invalid missed facts.');
+  if (data.app === 'FactFlowCheck' && (data.schemaVersion !== 2 || typeof data.assessmentId !== 'string' || !/^ffc-[a-zA-Z0-9-]{1,100}$/.test(data.assessmentId))) throw new Error('Missing or invalid assessment ID/version.');
+  if (JSON.stringify(data).length > 45000) throw new Error('Assessment is too large.');
+  if (data.bandResults && (!Array.isArray(data.bandResults) || data.bandResults.length > 8 || data.bandResults.some(function (band) {
+    return !band || !/^[A-H]$/.test(band.bandId) || ['pass', 'fail', 'incomplete', 'not_assessed'].indexOf(band.verdict) < 0;
+  }))) throw new Error('Invalid band evidence.');
+}
+
+function checkBandsWithVerdict(data, verdict) {
+  return (data.bandResults || []).filter(function (band) { return band.verdict === verdict; }).map(function (band) { return band.bandId; }).join(', ');
 }
 
 function appendCheckRaw(rawSheet, data, studentName) {
   rawSheet.appendRow([
-    data.completedAt ? new Date(data.completedAt) : new Date(),
-    studentName,
-    data.code || '',
-    data.assessmentName || '',
-    data.verifiedBand || '',
-    data.developingBand || '',
-    data.accuracy != null ? data.accuracy : '',
-    data.fluent != null ? data.fluent : '',
-    data.slow != null ? data.slow : '',
-    data.wrong != null ? data.wrong : '',
-    data.timeout != null ? data.timeout : '',
-    data.totalQuestions != null ? data.totalQuestions : '',
-    (data.missedFacts || []).join(', '),
-    data.durationSec != null ? data.durationSec : ''
-  ]);
+    new Date(data.completedAt), studentName, data.code || '', data.assessmentName || '',
+    data.verifiedBand || '', data.developingBand || '', data.accuracy, data.fluent,
+    data.slow, data.wrong, data.timeout, data.totalQuestions, data.missedFacts.join(', '),
+    data.durationSec || 0, data.assessmentId, JSON.stringify(data)
+  ].map(checkCell));
 }
 
 function upsertCheckSummary(summary, data, studentName) {
-  var foundRow = findCheckSummaryRow(summary, studentName);
-
-  var rowValues = [
-    studentName,
-    data.completedAt ? new Date(data.completedAt) : new Date(),
-    data.code || '',
-    data.verifiedBand || '',
-    data.developingBand || '',
-    data.accuracy != null ? data.accuracy + '%' : '',
-    data.fluent != null ? data.fluent : '',
-    data.slow != null ? data.slow : '',
-    (data.wrong || 0) + (data.timeout || 0),
-    (data.missedFacts || []).join(', ')
-  ];
-
-  if (foundRow > 0) {
-    summary.getRange(foundRow, 1, 1, rowValues.length).setValues([rowValues]);
-  } else {
-    summary.appendRow(rowValues);
-  }
-
-  if (summary.getLastRow() > 1) {
-    safeSortRange(summary, 2, 1, summary.getLastRow() - 1, summary.getLastColumn(), 1, true);
-  }
+  var row = findCheckSummaryRow(summary, studentName);
+  // A late retry must not replace a more recent snapshot.
+  if (row > 0 && new Date(summary.getRange(row, 2).getValue()).getTime() > Date.parse(data.completedAt)) return;
+  var values = [studentName, new Date(data.completedAt), data.code || '', data.verifiedBand || '',
+    data.developingBand || '', data.accuracy + '%', data.fluent, data.slow,
+    data.wrong + data.timeout, data.missedFacts.join(', '), data.assessmentId,
+    checkBandsWithVerdict(data, 'incomplete'), checkBandsWithVerdict(data, 'not_assessed'), data.finalReason || ''
+  ].map(checkCell);
+  if (row > 0) summary.getRange(row, 1, 1, values.length).setValues([values]);
+  else summary.appendRow(values);
+  safeSortRange(summary, 2, 1, summary.getLastRow() - 1, summary.getLastColumn(), 1, true);
 }
 
 function handleFactFlowCheck(data, e) {
   var lock = null;
-
+  var spreadsheetId;
   try {
-    var studentName = normalizeName(data.studentName) || 'Unknown';
-
+    validateCheck(data);
+    spreadsheetId = resolveTargetSpreadsheetId(data, e);
+    assertExpectedSpreadsheetId(data, spreadsheetId);
+    // Legacy clients lack IDs; use a deterministic key for their timestamped result.
+    if (!data.assessmentId) data.assessmentId = 'legacy-' + normalizeName(data.studentName) + '-' + data.completedAt;
     lock = LockService.getScriptLock();
     lock.waitLock(10000);
-
-    var spreadsheetId = resolveTargetSpreadsheetId(data, e);
-    assertExpectedSpreadsheetId(data, spreadsheetId);
     var ss = SpreadsheetApp.openById(spreadsheetId);
     var rawSheet = ensureCheckRawSheet(ss);
     var summary = ensureCheckSummarySheet(ss);
-
-    appendCheckRaw(rawSheet, data, studentName);
-    upsertCheckSummary(summary, data, studentName);
-
-    safeFlush();
-
-    return json({
-      ok: true,
-      receiver: 'factflow-check-v1',
-      buildVersion: BUILD_VERSION,
-      student: studentName,
-      spreadsheetId: spreadsheetId
-    });
-  } catch (err) {
-    return json({
-      ok: false,
-      receiver: 'factflow-check-v1',
-      buildVersion: BUILD_VERSION,
-      error: err && err.message ? err.message : String(err),
-      spreadsheetId: spreadsheetId
-    });
-  } finally {
-    if (lock) {
-      try {
-        lock.releaseLock();
-      } catch (e) {}
+    var count = rawSheet.getLastRow() - 1;
+    var existing = count > 0 ? rawSheet.getRange(2, 15, count, 2).getValues() : [];
+    var stored = null;
+    for (var i = 0; i < existing.length; i += 1) {
+      if (String(existing[i][0]) === data.assessmentId) { stored = JSON.parse(existing[i][1]); break; }
     }
+    if (stored) data = stored;
+    else appendCheckRaw(rawSheet, data, normalizeName(data.studentName));
+    // Also repairs a summary write that failed after the raw result was saved.
+    upsertCheckSummary(summary, data, normalizeName(data.studentName));
+    safeFlush();
+    return json({ ok: true, receiver: 'factflow-check-v2', buildVersion: BUILD_VERSION,
+      student: normalizeName(data.studentName), spreadsheetId: spreadsheetId, assessmentId: data.assessmentId });
+  } catch (err) {
+    return json({ ok: false, receiver: 'factflow-check-v2', buildVersion: BUILD_VERSION,
+      error: err && err.message ? err.message : String(err), spreadsheetId: spreadsheetId });
+  } finally {
+    if (lock) { try { lock.releaseLock(); } catch (e) {} }
   }
 }
