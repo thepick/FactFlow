@@ -2,6 +2,8 @@
 <html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
+  <meta name="theme-color" content="#0369a1" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#075985" media="(prefers-color-scheme: dark)">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FactFlow</title>
 
@@ -11,21 +13,27 @@
       --font-body: system-ui, -apple-system, 'Segoe UI', sans-serif;
       --text-xs: 0.72rem; --text-sm: 0.85rem; --text-base: 1rem;
       --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem; --space-4: 1rem; --space-5: 1.25rem; --space-6: 1.5rem;
-      --color-bg: #f7f6f2; --color-surface: #f9f8f5; --color-surface-2: #fbfbf9; --color-surface-offset: #f3f0ec; --color-border: #d4d1ca; --color-divider: #dcd9d5;
-      --color-text: #28251d; --color-text-muted: #66655f; --color-text-faint: #9a9892; --color-text-inverse: #f9f8f4;
-      --color-primary: #01696f; --color-primary-hover: #0c4e54; --color-primary-highlight: #cedcd8;
+      --color-bg: #f0f9ff; --color-surface: #ffffff; --color-surface-2: #f8fcff; --color-surface-offset: #eef6fb; --color-border: #c7dce8; --color-divider: #dceaf2;
+      --color-text: #0f172a; --color-text-muted: #475569; --color-text-faint: #64748b; --color-text-inverse: #ffffff;
+      --color-primary: #0369a1; --color-primary-hover: #075985; --color-primary-highlight: #e0f2fe;
       --color-success: #437a22; --color-success-highlight: #d4dfcc; --color-error: #a12c7b; --color-error-highlight: #e0ced7; --color-gold: #d19900; --color-gold-highlight: #e9e0c6;
       --radius-sm: 4px; --radius-md: 6px; --radius-lg: 10px; --radius-xl: 14px; --radius-full: 9999px;
       --shadow-sm: 0 1px 2px rgba(30,25,15,0.06); --shadow-md: 0 4px 12px rgba(30,25,15,0.08);
       --cell-fluent: #437a22; --cell-learning: #d19900; --cell-struggling: #a12c7b; --cell-locked: #d4d1ca; --cell-empty: #e8e5df; --cell-near-ready: #7caa4a;
+      --color-accent-highlight: #fbf2d9;
+      --color-header: #0369a1;
+      --color-accent: #e9c46a;
+      --color-header-text: #ffffff;
     }
     [data-theme="dark"] {
-      --color-bg: #171614; --color-surface: #1c1b19; --color-surface-2: #201f1d; --color-surface-offset: #22211f; --color-border: #393836; --color-divider: #262523;
-      --color-text: #e0ded8; --color-text-muted: #a6a29a; --color-text-faint: #6f6b64; --color-text-inverse: #1d1b17;
-      --color-primary: #4f98a3; --color-primary-hover: #227f8b; --color-primary-highlight: #313b3b;
+      --color-bg: #0b1623; --color-surface: #112235; --color-surface-2: #162c42; --color-surface-offset: #1b334b; --color-border: #36516a; --color-divider: #263e54;
+      --color-text: #e6f2fb; --color-text-muted: #b3c8d9; --color-text-faint: #8ba7bd; --color-text-inverse: #0b1623;
+      --color-primary: #7dd3fc; --color-primary-hover: #bae6fd; --color-primary-highlight: #153b53;
       --color-success: #6daa45; --color-success-highlight: #31422b; --color-error: #d163a7; --color-error-highlight: #4c3d46; --color-gold: #e8af34; --color-gold-highlight: #4d4332;
       --shadow-sm: 0 1px 2px rgba(0,0,0,0.2); --shadow-md: 0 4px 12px rgba(0,0,0,0.3);
       --cell-fluent: #6daa45; --cell-learning: #e8af34; --cell-struggling: #d163a7; --cell-locked: #393836; --cell-empty: #2a2926; --cell-near-ready: #8fc45a;
+      --color-accent-highlight: #3d3420;
+      --color-header: #075985;
     }
     *, *::before, *::after { box-sizing: border-box; }
     html { -webkit-text-size-adjust: none; text-size-adjust: none; }
@@ -41,9 +49,9 @@
     }
     input, select { width: 100%; min-height: 42px; border: 1px solid color-mix(in srgb, var(--color-text) 12%, transparent); background: var(--color-surface-2); border-radius: var(--radius-md); padding: 0.65rem 0.8rem; }
     .app { max-width: 1220px; margin: 0 auto; padding: var(--space-4); display: grid; gap: var(--space-4); }
-    .header { background: linear-gradient(135deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 75%, black)); color: var(--color-text-inverse); border-radius: var(--radius-xl); padding: var(--space-3) var(--space-5); display: flex; justify-content: space-between; align-items: center; box-shadow: var(--shadow-md); }
+    .header { background: linear-gradient(135deg, var(--color-header), color-mix(in srgb, var(--color-header) 75%, black)); color: var(--color-header-text); border-bottom: 3px solid var(--color-accent); border-radius: var(--radius-xl); padding: var(--space-3) var(--space-5); display: flex; justify-content: space-between; align-items: center; box-shadow: var(--shadow-md); }
     .brand { display: flex; gap: var(--space-3); align-items: center; }
-    .logo { width: 38px; height: 38px; border-radius: var(--radius-full); background: transparent; display: grid; place-items: center; flex: 0 0 auto; overflow: hidden; line-height: 0; align-self: center; }
+    .logo { width: 38px; height: 38px; border-radius: var(--radius-full); background: transparent; box-shadow: 0 0 0 2px var(--color-accent); display: grid; place-items: center; flex: 0 0 auto; overflow: hidden; line-height: 0; align-self: center; }
     .logo-mark { width: 100%; height: 100%; display: block; }
     .header h1 { font-size: 1.15rem; }
     .header-actions { display: flex; gap: var(--space-2); align-items: center; }
@@ -65,7 +73,7 @@
     .header-google-auth .signed-in-label { }
     .header, .header-actions, .header-google-auth, .header-google-auth .header-user-info { min-width: 0; }
     .header-google-auth .header-user-info { max-width: 100%; flex-wrap: nowrap; }
-    .icon-btn { width: 40px; height: 40px; display: grid; place-items: center; border-radius: var(--radius-md); background: rgba(255,255,255,0.12); color: var(--color-text-inverse); border: 1px solid rgba(255,255,255,0.16); font-size: 1rem; }
+    .icon-btn { width: 40px; height: 40px; display: grid; place-items: center; border-radius: var(--radius-md); background: rgba(255,255,255,0.12); color: var(--color-header-text); border: 1px solid rgba(255,255,255,0.16); font-size: 1rem; }
     .icon-btn:hover, .icon-btn.active { background: rgba(255,255,255,0.22); }
     .google-logo { width: 23px; height: 23px; display: block; }
     .settings-icon .google-logo { width: 20px; height: 20px; }
@@ -154,7 +162,7 @@
       font-size: var(--text-xs);
       border-radius: var(--radius-full);
     }
-    .pill { display: inline-flex; padding: 0.25rem 0.55rem; border-radius: var(--radius-full); background: var(--color-surface-offset); font-size: var(--text-xs); font-weight: 600; }
+    .pill { display: inline-flex; padding: 0.25rem 0.55rem; border-radius: var(--radius-full); background: var(--color-accent-highlight); font-size: var(--text-xs); font-weight: 600; }
     .timeout-overlay { display: none; text-align: center; padding: var(--space-4); background: var(--color-gold-highlight); border-radius: var(--radius-lg); border: 2px solid var(--color-gold); margin-top: var(--space-3); }
     .timeout-overlay.active { display: block; }
     .timeout-overlay .answer-reveal { font-size: 1.5rem; font-weight: 700; margin: var(--space-2) 0; }
@@ -1192,12 +1200,13 @@
 </script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
-    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="48x48" href="favicon-48x48.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
-    <link rel="apple-touch-icon" sizes="167x167" href="apple-touch-icon-167x167.png">
-    <link rel="apple-touch-icon" sizes="152x152" href="apple-touch-icon-152x152.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png?v=ocean-sand">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png?v=ocean-sand">
+    <link rel="icon" type="image/png" sizes="48x48" href="favicon-48x48.png?v=ocean-sand">
+    <link rel="icon" type="image/svg+xml" sizes="any" href="favicon.svg?v=ocean-sand">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=ocean-sand">
+    <link rel="apple-touch-icon" sizes="167x167" href="apple-touch-icon-167x167.png?v=ocean-sand">
+    <link rel="apple-touch-icon" sizes="152x152" href="apple-touch-icon-152x152.png?v=ocean-sand">
 </head>
 <body>
   <div class="app">
@@ -1205,7 +1214,7 @@
       <div class="brand">
         <div class="logo" aria-label="FactFlow logo" role="img">
           <svg class="logo-mark" viewBox="0 0 38 38" aria-hidden="true" focusable="false">
-            <circle cx="19" cy="19" r="19" fill="#454a93"></circle>
+            <circle cx="19" cy="19" r="19" fill="#0369a1"></circle>
             <path d="M12 12 L26 26 M26 12 L12 26" stroke="#ffffff" stroke-width="5.2" stroke-linecap="round"></path>
           </svg>
         </div>
