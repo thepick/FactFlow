@@ -1,5 +1,14 @@
 # FactFlow Classroom Submission Setup
 
+## Gmail reporting migration (9 October 2026)
+
+Class reporting now uses Gmail-owned Sheets and Apps Script deployments. Teacher links and class keys stay the same. Existing teachers retain their access; use the replacement Sheet links below. The deployed class-specific scripts preserve their existing reporting and quiz tabs. Edit those bound scripts for future updates rather than replacing them with an older receiver template.
+
+- IP5/8: https://docs.google.com/spreadsheets/d/1tM8s5BpZjMEYUrmYHPi7wMIIS2MACTZB9T_hcrTF2Yw/edit
+- IP5/9: https://docs.google.com/spreadsheets/d/1xNXKEVpKZ5AuDVKb129iqWYg2oYkTKT-_oCOoyUC2bg/edit
+- IP6/8: https://docs.google.com/spreadsheets/d/1G-ZGJKlb4EHaOiFpP-ooYl-AvpvFNt-nMS_Pa6QNqKw/edit
+- IP6/9: https://docs.google.com/spreadsheets/d/1EQCbeb6fBZxXeHwXDG59nwPPD0XtGQowCPgVMNAfcio/edit
+
 ## Shared receiver upgrade for independent assessments
 
 The receiver now matches FactFlow Quiz 2.8.0. Deploy this receiver (or the identical copy in FactFlow Quiz) before updating Quiz. Keep the existing Web App deployment URL by using Manage deployments → Edit → New version → Deploy.
@@ -23,38 +32,38 @@ For final production, the same rules apply on `https://factflow.mtomlinson.ca`.
 
 ## What has already been filled in
 
-The `TEACHERS` map in `index.html` now contains the existing class Apps Script Web App URLs from the FactFlow Quiz app:
+The `TEACHERS` map in `index.html` now contains the Gmail-owned class Apps Script Web App URLs:
 
 ```javascript
 var TEACHERS = {
   'IP5/9': {
     name: 'Ajarn Michael - IP5/9',
-    url: 'https://script.google.com/macros/s/AKfycbyuE5nR4e0d-qS5xvsoK_DdyUwUlBt-0uCBbG2KgNnhnF63B-B4g-DI819f5MfwDR93Bg/exec'
+    url: 'https://script.google.com/macros/s/AKfycbxa_GuiAo3_fYujGi5UC9J0e7EQhGtuanbFqQd13E5-wQ0t42jQAl2m2NZcWOhKJ-bcRw/exec'
   },
   'IP5/8': {
     name: 'Ajarn Jordan - IP5/8',
-    url: 'https://script.google.com/macros/s/AKfycbz1DSGVUh2rCaQBRAnf9SuXiF3Ki6tEXKSRNsoiKt-v8z8-UIMARxclA-YjCaU2fQO2OA/exec'
+    url: 'https://script.google.com/macros/s/AKfycbxMQhKQ2Zu9YwDOHO6eUI0s530_AJaIAYvAxwAwHcoM5sv3alX284KvDd_sOmShWdn1Rw/exec'
   },
   'IP6/8': {
     name: 'Ajarn Josh - IP6/8',
-    url: 'https://script.google.com/macros/s/AKfycbyJy786id7wxrcmooLTtht-durRYpvvxrjHlDteJm1_I4vy6qMLmFv56kUCsKJCn-2ZIQ/exec'
+    url: 'https://script.google.com/macros/s/AKfycbyoB9ydExLZ-UtCKT_GyCME0_rnyy034wWoMeB-13yGzHO_disH1WsJW6Witrn5CGkSFg/exec'
   },
   'IP6/9': {
     name: 'Ajarn Josh - IP6/9',
-    url: 'https://script.google.com/macros/s/AKfycby4nJY3uDXL68oKV-7bBVyxJbVTbQeIdHJ4UZm3MeiBHrQ7lYfePdwEPMSqGoTMMKQc/exec'
+    url: 'https://script.google.com/macros/s/AKfycbxnixW1_t5d2XyDTvLYqJJDDFg4_oNbkG7VJu2VwCCcr6CeJaiKjb0_86kjXJl0SXnzXQ/exec'
   }
 };
 ```
 
-Important: those URLs are filled in, but the Google Apps Script projects behind those URLs still need to use the combined receiver included in this project. If the old FactFlow Quiz-only receiver is still deployed, the app will now fail closed: it checks the receiver first and will not send practice data unless the receiver reports `factflow-combined-v1`.
+The Gmail deployments already use the migrated class-specific combined receivers. If the old FactFlow Quiz-only receiver is still deployed, the app will now fail closed: it checks the receiver first and will not send practice data unless the receiver reports `factflow-combined-v1`.
 
-## Required Google Apps Script update
+## Future Google Apps Script updates
 
 For each class spreadsheet/script project:
 
 1. Open the class Google Sheet.
 2. Go to Extensions > Apps Script.
-3. Replace the existing script with `factflow-practice-apps-script.gs` from this zip.
+3. Edit the migrated bound script directly, preserving its class-specific reporting and quiz behavior.
 4. Confirm the project uses the V8 runtime.
 5. Deploy the updated Web App.
    - Execute as: Me

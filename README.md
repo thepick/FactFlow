@@ -293,19 +293,19 @@ The current `TEACHERS` entries are:
 var TEACHERS = {
   'IP5/9': {
     name: 'Ajarn Michael - IP5/9',
-    url: 'https://script.google.com/macros/s/AKfycbyH5YG85Vbh6Gy03dUpOcJB6w4ifkO9tv4j3AsHdvSSJEHGUHvf-WL5JLsYi-vJYsEClg/exec'
+    url: 'https://script.google.com/macros/s/AKfycbxa_GuiAo3_fYujGi5UC9J0e7EQhGtuanbFqQd13E5-wQ0t42jQAl2m2NZcWOhKJ-bcRw/exec'
   },
   'IP5/8': {
     name: 'Ajarn Jordan - IP5/8',
-    url: 'https://script.google.com/macros/s/AKfycbwgJ0TKTAYtBVMv0cWLcUEbakBT-ZStjffCBqtdnjKS7xp5AaEr19FYnSIOgY9grCednA/exec'
+    url: 'https://script.google.com/macros/s/AKfycbxMQhKQ2Zu9YwDOHO6eUI0s530_AJaIAYvAxwAwHcoM5sv3alX284KvDd_sOmShWdn1Rw/exec'
   },
   'IP6/8': {
     name: 'Ajarn Josh - IP6/8',
-    url: 'https://script.google.com/macros/s/AKfycbyJy786id7wxrcmooLTtht-durRYpvvxrjHlDteJm1_I4vy6qMLmFv56kUCsKJCn-2ZIQ/exec'
+    url: 'https://script.google.com/macros/s/AKfycbyoB9ydExLZ-UtCKT_GyCME0_rnyy034wWoMeB-13yGzHO_disH1WsJW6Witrn5CGkSFg/exec'
   },
   'IP6/9': {
     name: 'Ajarn Josh - IP6/9',
-    url: 'https://script.google.com/macros/s/AKfycby4nJY3uDXL68oKV-7bBVyxJbVTbQeIdHJ4UZm3MeiBHrQ7lYfePdwEPMSqGoTMMKQc/exec'
+    url: 'https://script.google.com/macros/s/AKfycbxnixW1_t5d2XyDTvLYqJJDDFg4_oNbkG7VJu2VwCCcr6CeJaiKjb0_86kjXJl0SXnzXQ/exec'
   }
 };
 ```
