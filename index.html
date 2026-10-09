@@ -3774,7 +3774,9 @@
           if (!oldProgress || !newProgress) throw new Error('Saved progress format needs review. No file was overwritten.');
           return Object.assign({}, original, current, wrapProgressForDrive(mergeProgress(oldProgress, newProgress)));
         }
-      }, syncState.accessToken).then(function () {
+      }, syncState.accessToken).then(function (result) {
+        syncState.googleUser = result.user;
+        cacheGoogleUser(result.user);
         syncState.driveFileId = null;
         continueGoogleSignedIn();
       }).catch(function (error) {

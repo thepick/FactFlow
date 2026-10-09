@@ -43,6 +43,9 @@ function setup(){
 }
 async function until(fn){for(let i=0;i<50&&!fn();i++)await new Promise(setImmediate);assert.ok(fn(),'Condition did not complete');}
 (async()=>{
+ const binary = new Blob(['image']);
+ let binaryCheck = setup();
+ assert.equal(binaryCheck.api.remap({binary}, {}).binary, binary, 'IndexedDB photograph blobs must remain blobs');
  // New-client empty storage gets every raw byte including unknown fields. No old-token writes.
  let s=setup();const original=s.file('old','progress.json',{progress:{history:[1,2],settings:{speed:30}},extra:'retained'});
  await s.api.recoverAppData(s.config,'old','new');assert.deepEqual(Buffer.from(s.files.find(f=>f.token==='new').data),Buffer.from(original.data));assert.equal(s.files.filter(f=>f.token==='old').length,1);

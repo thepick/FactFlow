@@ -77,7 +77,7 @@
   function remap(value, ids) {
     if (typeof value === 'string') return ids[value] || value;
     if (Array.isArray(value)) return value.map(item => remap(item, ids));
-    if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [ids[key] || key, remap(item, ids)]));
+    if (Object.prototype.toString.call(value) === '[object Object]') return Object.fromEntries(Object.entries(value).map(([key, item]) => [ids[key] || key, remap(item, ids)]));
     return value;
   }
   async function recoverFolder(config, oldToken, newToken) {
@@ -124,7 +124,7 @@
     const markers = await list(newToken, 'name=' + quote(marker), space);
     for (const file of markers) {
       const saved = JSON.parse(new TextDecoder().decode(await read(newToken, file.id)));
-      if (saved.userId === user.id && saved.oldClient === config.oldClient && saved.newClient === config.newClient) return saved;
+      if (saved.userId === user.id && saved.oldClient === config.oldClient && saved.newClient === config.newClient) return {...saved, user};
     }
     return new Promise((resolve, reject) => {
       const dialog = document.createElement('dialog');
@@ -154,7 +154,7 @@
           }
           const saved = {version: 1, userId: user.id, oldClient: config.oldClient, newClient: config.newClient, completedAt: new Date().toISOString(), ids};
           await upload(newToken, {name: marker, mimeType: 'application/json', parents: [config.folderName ? 'root' : 'appDataFolder']}, new TextEncoder().encode(JSON.stringify(saved)));
-          close(); resolve(saved);
+          close(); resolve({...saved, user});
         } catch (error) {
           message.textContent = error.message;
           for (const button of [recover, fresh, cancel]) button.disabled = false;
