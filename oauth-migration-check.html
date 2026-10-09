@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>FactFlow Google sync migration check</title>
+  <style>
+    body{font:17px/1.5 system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0 20px;color:#192b36;background:#f5f8fa}
+    main{background:white;padding:28px;border-radius:16px}h1{font-size:1.8rem;line-height:1.2}
+    button{font:inherit;padding:12px 16px;margin:5px 5px 5px 0;border:1px solid #647a88;border-radius:8px;background:#e9f3f8;color:#192b36;cursor:pointer}
+    button:disabled{opacity:.5;cursor:default}button:focus-visible{outline:3px solid #2069b4;outline-offset:3px}
+    pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f3f6f8;padding:16px;border-radius:8px;font:15px/1.6 system-ui,sans-serif}
+  </style>
+</head>
+<body><main>
+  <h1>FactFlow Google sync migration check</h1>
+  <p>This page reads your saved FactFlow file through the current Google setup, then through the Gmail-owned replacement. It never writes, deletes, or changes your progress.</p>
+  <ol>
+    <li>Check the current setup using the account that has saved progress.</li>
+    <li>Download a backup of that original file.</li>
+    <li>Check the replacement using the same account.</li>
+  </ol>
+  <button id="old">1. Read original saved progress</button>
+  <button id="backup" disabled>2. Download original backup</button>
+  <button id="new" disabled>3. Check Gmail replacement</button>
+  <pre id="status" role="status" aria-live="polite">Ready. The normal FactFlow app still uses its original Google setup.</pre>
+  <p>Google may ask you to approve the same profile, email, and app-specific Drive permissions FactFlow already uses. No progress is sent to GitHub or a reporting service.</p>
+</main>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script id="migration-code">
+'use strict';
+const clients = {
+  old: '220590044784-6bohsjumu2r67ds92lhmfdubhh3qen5i.apps.googleusercontent.com',
+  new: '448557384338-sar6uknjmtr36fosgpm0jivsn7m4mhqj.apps.googleusercontent.com'
+};
+const scopes = ['https://www.googleapis.com/auth/drive.appdata', 'https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email'];
+const snapshots = {old: null, new: null};
+const status = document.getElementById('status');
+function compareSnapshots(original, replacement) {
+  if (!original || !replacement) return 'Both checks are required.';
+  if (original.user.id !== replacement.user.id) return 'Different Google accounts selected. Select the original account for the replacement check.';
+  if (!original.files.length) return 'The original setup returned no saved FactFlow file. There is no baseline to compare; do not switch the live app.';
+  const missing = original.files.filter(file => !replacement.files.some(other => other.id === file.id));
+  if (missing.length) return 'The replacement cannot see ' + missing.length + ' original saved file(s). A data migration is required before switching the live app.';
+  if (original.files.some(file => replacement.files.find(other => other.id === file.id).sha256 !== file.sha256)) return 'The saved file contents changed between checks. Stop practice on other tabs or devices and repeat the comparison.';
+  return 'The replacement can read every original saved file with identical contents. Saving and fresh-device recovery still need testing before cutover.';
+}
+async function apiGet(url, token, asText = false) {
+  const response = await fetch(url, {method: 'GET', headers: {Authorization: 'Bearer ' + token}, cache: 'no-store', signal: AbortSignal.timeout(20000)});
+  if (!response.ok) throw new Error('Google read failed (HTTP ' + response.status + '). No progress was changed.');
+  return asText ? response.text() : response.json();
+}
+async function readSnapshot(token, expectedUserId) {
+  const user = await apiGet('https://www.googleapis.com/oauth2/v2/userinfo', token);
+  if (typeof user.id !== 'string' || !user.id || !user.email) throw new Error('Google account identity could not be verified.');
+  if (expectedUserId && user.id !== expectedUserId) throw new Error('Different Google account selected. Choose the original account; no progress files were read.');
+  const files = [];
+  const pages = new Set();
+  let nextPageToken;
+  do {
+    const query = new URLSearchParams({spaces: 'appDataFolder', q: "trashed = false and name = 'factflow_data.json'", fields: 'nextPageToken,files(id,name,modifiedTime)', pageSize: '1000'});
+    if (nextPageToken) query.set('pageToken', nextPageToken);
+    const page = await apiGet('https://www.googleapis.com/drive/v3/files?' + query, token);
+    if (!Array.isArray(page.files)) throw new Error('Google returned an incomplete file listing.');
+    for (const file of page.files) {
+      if (!file.id || file.name !== 'factflow_data.json') throw new Error('Google returned an unexpected file.');
+      const text = await apiGet('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(file.id) + '?alt=media', token, true);
+      const data = JSON.parse(text);
+      if (!data || typeof data !== 'object') throw new Error('The saved progress is not a JSON object.');
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+      files.push({...file, text, sha256: Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')});
+    }
+    nextPageToken = page.nextPageToken;
+    if (nextPageToken && pages.has(nextPageToken)) throw new Error('Google repeated a file-list page; comparison stopped.');
+    if (nextPageToken) pages.add(nextPageToken);
+  } while (nextPageToken);
+  return {user: {id: user.id, email: user.email}, files};
+}
+function render() {
+  const lines = [];
+  for (const which of ['old', 'new']) {
+    const snapshot = snapshots[which];
+    if (snapshot) lines.push((which === 'old' ? 'Original' : 'Replacement') + ': ' + snapshot.user.email + '\nSaved FactFlow files: ' + snapshot.files.length);
+  }
+  lines.push(compareSnapshots(snapshots.old, snapshots.new));
+  status.textContent = lines.join('\n\n');
+}
+function setBusy(busy) {
+  document.getElementById('old').disabled = busy;
+  document.getElementById('new').disabled = busy || !snapshots.old;
+  document.getElementById('backup').disabled = busy || !snapshots.old?.files.length;
+}
+function authorize(which) {
+  return new Promise((resolve, reject) => {
+    const oauth = window.google?.accounts?.oauth2;
+    if (!oauth) return reject(new Error('Google sign-in is still loading or was blocked. Reload this page and try again.'));
+    const client = oauth.initTokenClient({client_id: clients[which], scope: scopes.join(' '), include_granted_scopes: false,
+      callback: response => {
+        if (response.error || !response.access_token) return reject(new Error('Google authorization was not completed.'));
+        if (!oauth.hasGrantedAllScopes(response, ...scopes)) return reject(new Error('Not all requested permissions were granted. No files were read.'));
+        resolve(response.access_token);
+      },
+      error_callback: () => reject(new Error('Google sign-in was closed or the popup was blocked. Try again.'))
+    });
+    client.requestAccessToken({prompt: 'select_account'});
+  });
+}
+async function run(which) {
+  snapshots[which] = null;
+  if (which === 'old') snapshots.new = null;
+  setBusy(true);
+  status.textContent = 'Choose the account with saved FactFlow progress in Google. Reading only; no progress will be changed.';
+  try {
+    const token = await authorize(which);
+    snapshots[which] = await readSnapshot(token, which === 'new' ? snapshots.old.user.id : undefined);
+    render();
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    setBusy(false);
+  }
+}
+document.getElementById('old').addEventListener('click', () => run('old'));
+document.getElementById('new').addEventListener('click', () => run('new'));
+document.getElementById('backup').addEventListener('click', () => {
+  if (!snapshots.old?.files.length) return;
+  const backup = {format: 'factflow-original-drive-backup', version: 1, exportedAt: new Date().toISOString(), clientId: clients.old, ...snapshots.old};
+  const url = URL.createObjectURL(new Blob([JSON.stringify(backup)], {type: 'application/json'}));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'factflow-original-drive-backup.json';
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+</script>
+</body>
+</html>
