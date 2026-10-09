@@ -1584,6 +1584,7 @@
   <div id="mobileCornerTimer" aria-live="polite" aria-label="Time remaining"></div>
   <div class="levelup-toast" id="levelupToast" aria-live="polite"></div>
   <div class="graph-tooltip" id="graphTooltip"></div>
+  <script src="google-drive-migration.js"></script>
   <script>
   (function () {
     'use strict';
@@ -1593,7 +1594,7 @@
 
     // In Google Cloud Console, add your GitHub Pages URL to Authorized JavaScript origins.
 
-    var GOOGLE_CLIENT_ID = '220590044784-6bohsjumu2r67ds92lhmfdubhh3qen5i.apps.googleusercontent.com';
+    var GOOGLE_CLIENT_ID = '448557384338-sar6uknjmtr36fosgpm0jivsn7m4mhqj.apps.googleusercontent.com';
     var GOOGLE_DRIVE_APPDATA_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
     var GOOGLE_DRIVE_SCOPE = GOOGLE_DRIVE_APPDATA_SCOPE + ' https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
     var DRIVE_FILE_NAME = 'factflow_data.json';
@@ -1612,7 +1613,7 @@
     // Local sync metadata keys.
     var LOCAL_DEVICE_ID_KEY = 'factflow-device-id';
     var SYNC_ENABLED_KEY = 'factflow-sync-enabled-before';
-    var SYNC_TOKEN_SESSION_KEY = 'factflow-google-token-session';
+    var SYNC_TOKEN_SESSION_KEY = 'factflow-google-token-session-gmail-v1';
     var GOOGLE_USER_CACHE_KEY = 'factflow-google-user-cache';
     var SYNC_INTENT_KEY = 'factflow_intent_to_sync';
     var UNSYNCED_RECOVERY_KEY = 'factflow-unsynced-recovery-v1';
@@ -3762,6 +3763,31 @@
     }
 
     function onGoogleSignedIn() {
+      setPracticeLocked(true, 'Keeping your saved Google progress...');
+      setSyncStatus('syncing', 'Checking saved progress...');
+      return window.GoogleDriveMigration.ensure({
+        oldClient: '220590044784-6bohsjumu2r67ds92lhmfdubhh3qen5i.apps.googleusercontent.com', newClient: GOOGLE_CLIENT_ID,
+        scope: GOOGLE_DRIVE_SCOPE, fileName: DRIVE_FILE_NAME,
+        merge: function (original, current) {
+          var oldProgress = unwrapDriveProgress(original);
+          var newProgress = unwrapDriveProgress(current);
+          if (!oldProgress || !newProgress) throw new Error('Saved progress format needs review. No file was overwritten.');
+          return Object.assign({}, original, current, wrapProgressForDrive(mergeProgress(oldProgress, newProgress)));
+        }
+      }, syncState.accessToken).then(function () {
+        syncState.driveFileId = null;
+        continueGoogleSignedIn();
+      }).catch(function (error) {
+        clearProactiveRefreshTimer();
+        clearTokenSession();
+        syncState.signedIn = false;
+        syncState.accessToken = null;
+        setPracticeLocked(true, error.message);
+        setSyncStatus('error', error.message);
+      });
+    }
+
+    function continueGoogleSignedIn() {
       console.log('[FactFlow Sync] onGoogleSignedIn start', {
         signedIn: syncState.signedIn,
         hasToken: !!syncState.accessToken,
