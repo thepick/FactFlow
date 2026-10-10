@@ -1,13 +1,13 @@
 # FactFlow Classroom Submission Setup
 
-## Original Sheet reporting with Gmail scripts (10 October 2026)
+## Gmail-owned reporting (10 October 2026)
 
-Class reporting uses the original shared Sheets below, with reporting scripts deployed under pickripper@gmail.com. Existing Sheet URLs, teacher access and class keys stay the same. Sheets remain owned by michael.t@ku.th. The Gmail-owned script projects preserve each class's existing reporting and quiz behavior; edit those projects for future updates rather than replacing the original Sheets' older bound scripts.
+Class reporting uses the Gmail-owned Sheets below and reporting scripts deployed under pickripper@gmail.com. Classroom app links, teacher access and class keys stay the same; teachers must use these new Sheet URLs. All active reporting Sheets and scripts are owned by pickripper@gmail.com. Edit the Gmail-owned script projects below, preserving each class's existing reporting and quiz behavior.
 
-- IP5/8: https://docs.google.com/spreadsheets/d/1VYs2dbduN8s5R3YEoOzIqQO2fnHko0YQypd3MYKn3Wg/edit
-- IP5/9: https://docs.google.com/spreadsheets/d/1hLfZ0OJ5huE3OKg5w4wLvMLu5ImP2SDHdmtX89C7JJY/edit
-- IP6/8: https://docs.google.com/spreadsheets/d/14bjzUQ3tq_An3Ef5VSydZ84LrXueqk0oJF8HmUyihiI/edit
-- IP6/9: https://docs.google.com/spreadsheets/d/1iY1_YWHFvFDtvwz5FyWJtbnKCq8ixSIjGpysJ1LSg7Y/edit
+- IP5/8: https://docs.google.com/spreadsheets/d/1tM8s5BpZjMEYUrmYHPi7wMIIS2MACTZB9T_hcrTF2Yw/edit
+- IP5/9: https://docs.google.com/spreadsheets/d/1xNXKEVpKZ5AuDVKb129iqWYg2oYkTKT-_oCOoyUC2bg/edit
+- IP6/8: https://docs.google.com/spreadsheets/d/1G-ZGJKlb4EHaOiFpP-ooYl-AvpvFNt-nMS_Pa6QNqKw/edit
+- IP6/9: https://docs.google.com/spreadsheets/d/1EQCbeb6fBZxXeHwXDG59nwPPD0XtGQowCPgVMNAfcio/edit
 
 ## Shared receiver upgrade for independent assessments
 
@@ -68,7 +68,7 @@ For each class spreadsheet/script project:
 
 1. Open the Gmail-owned reporting script project listed above.
 2. Edit that script directly, preserving its class-specific reporting and quiz behavior.
-3. Confirm its class routing points to the original Sheets above.
+3. Confirm its class routing points to the Gmail-owned Sheets above.
 4. Confirm the project uses the V8 runtime.
 5. Deploy the updated Web App.
    - Execute as: Me
