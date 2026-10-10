@@ -1,13 +1,13 @@
 # FactFlow Classroom Submission Setup
 
-## Gmail reporting migration (9 October 2026)
+## Original Sheet reporting with Gmail scripts (10 October 2026)
 
-Class reporting now uses Gmail-owned Sheets and Apps Script deployments. Teacher links and class keys stay the same. Existing teachers retain their access; use the replacement Sheet links below. The deployed class-specific scripts preserve their existing reporting and quiz tabs. Edit those bound scripts for future updates rather than replacing them with an older receiver template.
+Class reporting uses the original shared Sheets below, with reporting scripts deployed under pickripper@gmail.com. Existing Sheet URLs, teacher access and class keys stay the same. Sheets remain owned by michael.t@ku.th. The Gmail-owned script projects preserve each class's existing reporting and quiz behavior; edit those projects for future updates rather than replacing the original Sheets' older bound scripts.
 
-- IP5/8: https://docs.google.com/spreadsheets/d/1tM8s5BpZjMEYUrmYHPi7wMIIS2MACTZB9T_hcrTF2Yw/edit
-- IP5/9: https://docs.google.com/spreadsheets/d/1xNXKEVpKZ5AuDVKb129iqWYg2oYkTKT-_oCOoyUC2bg/edit
-- IP6/8: https://docs.google.com/spreadsheets/d/1G-ZGJKlb4EHaOiFpP-ooYl-AvpvFNt-nMS_Pa6QNqKw/edit
-- IP6/9: https://docs.google.com/spreadsheets/d/1EQCbeb6fBZxXeHwXDG59nwPPD0XtGQowCPgVMNAfcio/edit
+- IP5/8: https://docs.google.com/spreadsheets/d/1VYs2dbduN8s5R3YEoOzIqQO2fnHko0YQypd3MYKn3Wg/edit
+- IP5/9: https://docs.google.com/spreadsheets/d/1hLfZ0OJ5huE3OKg5w4wLvMLu5ImP2SDHdmtX89C7JJY/edit
+- IP6/8: https://docs.google.com/spreadsheets/d/14bjzUQ3tq_An3Ef5VSydZ84LrXueqk0oJF8HmUyihiI/edit
+- IP6/9: https://docs.google.com/spreadsheets/d/1iY1_YWHFvFDtvwz5FyWJtbnKCq8ixSIjGpysJ1LSg7Y/edit
 
 ## Shared receiver upgrade for independent assessments
 
@@ -59,11 +59,16 @@ The Gmail deployments already use the migrated class-specific combined receivers
 
 ## Future Google Apps Script updates
 
+- IP5/8: https://script.google.com/home/projects/1akqvhOPR1SCWwNqjFB8otWB3yc2ZPjMk5TUan4JIsxTYgu4eIJIsZe1G/edit
+- IP5/9: https://script.google.com/home/projects/1pEovd9gnfwtpN4F63CGicxEKC6KsWyydSwpms-g_63lyyDyWE4tL0YPy/edit
+- IP6/8: https://script.google.com/home/projects/1EzWfiqSnWZuP4-MmcHpmS-FbqiKMnZ45y1hnQI0iz57AmQoktEUgm8qb/edit
+- IP6/9: https://script.google.com/home/projects/1PH6uW-UDvwsRu6bfLsfmdkie-foTQ3AWxsIWyEtz9yjOQ2V4eeeKxy-s/edit
+
 For each class spreadsheet/script project:
 
-1. Open the class Google Sheet.
-2. Go to Extensions > Apps Script.
-3. Edit the migrated bound script directly, preserving its class-specific reporting and quiz behavior.
+1. Open the Gmail-owned reporting script project listed above.
+2. Edit that script directly, preserving its class-specific reporting and quiz behavior.
+3. Confirm its class routing points to the original Sheets above.
 4. Confirm the project uses the V8 runtime.
 5. Deploy the updated Web App.
    - Execute as: Me

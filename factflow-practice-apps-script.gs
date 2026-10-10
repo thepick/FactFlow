@@ -20,10 +20,10 @@
 var BUILD_VERSION = 'factflow-combined-v6-quiz-tabs';
 
 var CLASS_SPREADSHEET_IDS = {
-  'ip5/8': '1tM8s5BpZjMEYUrmYHPi7wMIIS2MACTZB9T_hcrTF2Yw',
-  'ip5/9': '1xNXKEVpKZ5AuDVKb129iqWYg2oYkTKT-_oCOoyUC2bg',
-  'ip6/8': '1G-ZGJKlb4EHaOiFpP-ooYl-AvpvFNt-nMS_Pa6QNqKw',
-  'ip6/9': '1EQCbeb6fBZxXeHwXDG59nwPPD0XtGQowCPgVMNAfcio'
+  'ip5/8': '1VYs2dbduN8s5R3YEoOzIqQO2fnHko0YQypd3MYKn3Wg',
+  'ip5/9': '1hLfZ0OJ5huE3OKg5w4wLvMLu5ImP2SDHdmtX89C7JJY',
+  'ip6/8': '14bjzUQ3tq_An3Ef5VSydZ84LrXueqk0oJF8HmUyihiI',
+  'ip6/9': '1iY1_YWHFvFDtvwz5FyWJtbnKCq8ixSIjGpysJ1LSg7Y'
 };
 
 var ALLOWED_CLASS_CODES = ['IP5/8', 'IP5/9', 'IP6/8', 'IP6/9'];
