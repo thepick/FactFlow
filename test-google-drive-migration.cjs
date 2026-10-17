@@ -6,26 +6,9 @@ function setup(){
  function file(token,name,data,parent='appDataFolder',mimeType='application/json'){const f={id:'id'+(++count),token,name,mimeType,parents:[parent],data:bytes(data),appProperties:{}};files.push(f);return f;}
  function element(tag){return {tag,children:[],style:{},textContent:'',setAttribute(){},addEventListener(){},append(...els){this.children.push(...els);},showModal(){},close(){},remove(){}};}
  const document={createElement:element,body:{append(d){dialog=d;}}};
- const reply=(data,status=200,headers={})=>new Response(typeof data==='string'||data instanceof Uint8Array?data:JSON.stringify(data),{status,headers});
+ function reply(data,status=200,headers={}){return new Response(typeof data==='string'||data instanceof Uint8Array?data:JSON.stringify(data),{status,headers});}
  const context={window:{google:{accounts:{oauth2:{hasGrantedAllScopes:()=>true,initTokenClient:cfg=>({requestAccessToken(){cfg.callback({access_token:'old',expires_in:3600});}})}}}},document,Blob,AbortSignal,URLSearchParams,TextEncoder,TextDecoder,crypto:webcrypto,console};
- context.fetch=async(url,opts={})=>{
-  const token=opts.headers.Authorization.replace('Bearer ',''),method=opts.method||'GET';calls.push({url,token,method});
-  assert.ok(token!=='old'||method==='GET','Original must be read only');
-  if(fail)return reply({},500);
-  if(url.includes('/userinfo'))return reply({id:token==='old'&&badUser?'other':'same',email:'test@example.com'});
-  if(uploads.has(url)){
-   const {meta,id}=uploads.get(url);let f=files.find(x=>x.id===id);
-   if(!f){f=file(token,meta.name,'',meta.parents?.[0]||'root',meta.mimeType);}
-   f.appProperties={...f.appProperties,...meta.appProperties};f.data=new Uint8Array(await opts.body.arrayBuffer());
-   if(corrupt)f.data=bytes('bad');return reply({id:f.id});
-  }
-  if(url.includes('uploadType=resumable')){
-   const id=url.match(/\/files\/([^?]+)/)?.[1],location='https://www.googleapis.com/upload/session/'+(++count);
-   uploads.set(location,{id,meta:JSON.parse(opts.body)});return reply({},200,{Location:location});
-  }
-  if(method==='POST'){
-   const m=JSON.parse(opts.body),f=file(token,m.name,'',m.parents?.[0]||'root',m.mimeType);f.appProperties=m.appProperties||{};return reply({id:f.id});
-  }
+ function fileResponse(url,token){
   const id=url.match(/\/files\/([^?]+)/)?.[1];
   if(id){const f=files.find(x=>x.id===decodeURIComponent(id)&&x.token===token);if(!f)return reply({},404);if(changed&&token==='old')f.data=bytes({progress:'changed'});return reply(f.data);}
   const q=new URL(url).searchParams.get('q')||'',space=new URL(url).searchParams.get('spaces');
@@ -35,6 +18,33 @@ function setup(){
   if(q.includes('mimeType='))matching=matching.filter(f=>f.mimeType==='application/vnd.google-apps.folder');
   if(q.includes('oauthSource'))matching=matching.filter(f=>f.appProperties.oauthSource==='oldclient');
   return reply({files:matching.map(({data,token,...metadata})=>metadata)});
+ }
+ function uploadFile(url,token){
+   const {meta,id}=uploads.get(url);let f=files.find(x=>x.id===id);
+   if(!f){f=file(token,meta.name,'',meta.parents?.[0]||'root',meta.mimeType);}
+   f.appProperties={...f.appProperties,...meta.appProperties};
+   return f;
+ }
+ function createFileResponse(token,opts){
+   const m=JSON.parse(opts.body),f=file(token,m.name,'',m.parents?.[0]||'root',m.mimeType);f.appProperties=m.appProperties||{};return reply({id:f.id});
+ }
+ context.fetch=async(url,opts={})=>{
+  const token=opts.headers.Authorization.replace('Bearer ',''),method=opts.method||'GET';calls.push({url,token,method});
+  assert.ok(token!=='old'||method==='GET','Original must be read only');
+  if(fail)return reply({},500);
+  if(url.includes('/userinfo'))return reply({id:token==='old'&&badUser?'other':'same',email:'test@example.com'});
+  if(uploads.has(url)){
+   const f=uploadFile(url,token);f.data=new Uint8Array(await opts.body.arrayBuffer());
+   if(corrupt)f.data=bytes('bad');return reply({id:f.id});
+  }
+  if(url.includes('uploadType=resumable')){
+   const id=url.match(/\/files\/([^?]+)/)?.[1],location='https://www.googleapis.com/upload/session/'+(++count);
+   uploads.set(location,{id,meta:JSON.parse(opts.body)});return reply({},200,{Location:location});
+  }
+  if(method==='POST'){
+   return createFileResponse(token,opts);
+  }
+  return fileResponse(url,token);
  };
  vm.createContext(context);vm.runInContext(source.replace('window.GoogleDriveMigration = {ensure, remap};','window.GoogleDriveMigration = {ensure, remap, recoverAppData, recoverFolder, list};'),context);
  const api=context.window.GoogleDriveMigration;
@@ -65,5 +75,25 @@ async function until(fn){for(let i=0;i<50&&!fn();i++)await new Promise(setImmedi
  const config={...s.config,fileName:undefined,folderName:'WritingFeedbackTool'};const ids=await s.api.recoverFolder(config,'old','new');
  assert.equal(new TextDecoder().decode(s.files.find(f=>f.id===ids[image.id]).data),'image-bytes');const recovered=JSON.parse(new TextDecoder().decode(s.files.find(f=>f.id===ids[portfolio.id]).data));assert.equal(recovered.student.sessions[0].image.driveFileId,ids[image.id]);assert.equal(recovered.unknown,'keep');assert.deepEqual(s.files.find(f=>f.id===ids[image.id]).parents,[ids[media.id]]);
  const n=s.files.length;await s.api.recoverFolder(config,'old','new');assert.equal(s.files.length,n,'Portfolio retry must not duplicate files');
+ // Duplicate metadata for another original must not block an otherwise reusable folder.
+ const unrelated=[s.file('new','unrelated-a','keep-a','root'),s.file('new','unrelated-b','keep-b','root')];
+ for(const f of unrelated)f.appProperties={oauthSource:'oldclient',oauthOriginal:'not-in-original-tree'};
+ const beforeRetry=s.calls.length;
+ assert.deepEqual(await s.api.recoverFolder(config,'old','new'),ids,'Every existing copy ID must be reused in traversal order');
+ assert.equal(s.files.length,n+2,'Unrelated duplicate groups must not create more copies');
+ assert.deepEqual(unrelated.map(f=>new TextDecoder().decode(f.data)),['keep-a','keep-b']);
+ assert.ok(s.calls.slice(beforeRetry).every(c=>c.method!=='POST'),'Reusing all folder copies requires no new allocation');
+ // Reject a duplicate only when traversal reaches that original, after any earlier allocations.
+ for(const duplicateAt of ['root','child']){
+  const d=setup(),root=d.file('old','WritingFeedbackTool','','root','application/vnd.google-apps.folder');
+  const child=d.file('old','photo.jpg','original-image',root.id,'image/jpeg'),target=duplicateAt==='root'?root:child;
+  const originals=d.files.map(f=>({id:f.id,data:Buffer.from(f.data).toString('base64'),parents:[...f.parents]}));
+  for(const name of ['first-copy','second-copy'])d.file('new',name,'existing-copy','root',target.mimeType).appProperties={oauthSource:'oldclient',oauthOriginal:target.id};
+  await assert.rejects(d.api.recoverFolder({...d.config,fileName:undefined,folderName:'WritingFeedbackTool'},'old','new'),/^Error: Duplicate recovery copies require reconciliation\.$/);
+  assert.deepEqual(d.calls.filter(c=>c.method!=='GET'),duplicateAt==='root'?[]:[{url:'https://www.googleapis.com/drive/v3/files?fields=id',token:'new',method:'POST'}],'Duplicate child is rejected after allocating its parent, before any upload');
+  const allocated=d.files.filter(f=>f.token==='new').slice(2);
+  assert.deepEqual(allocated.map(f=>({name:f.name,original:f.appProperties.oauthOriginal,parents:f.parents})),duplicateAt==='root'?[]:[{name:'WritingFeedbackTool',original:root.id,parents:['root']}]);
+  assert.deepEqual(d.files.filter(f=>f.token==='old').map(f=>({id:f.id,data:Buffer.from(f.data).toString('base64'),parents:[...f.parents]})),originals);
+ }
  console.log('Migration tests passed: raw progress, merge, read-back corruption, duplicates, same-account gate, cancellation, persistent completion, nested portfolio/media IDs, retry without duplicates.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
