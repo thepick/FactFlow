@@ -56,8 +56,8 @@
     .header h1 { font-size: 1.15rem; }
     .header-actions { display: flex; gap: var(--space-2); align-items: center; }
     .header-google-auth { display: flex; align-items: center; justify-content: flex-end; min-width: 0; }
-    .header-google-auth .btn-google-signin { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 16px; border-radius: var(--radius-md); background: #ffffff; color: #3c4043; border: 1px solid #dadce0; font-size: var(--text-sm); font-weight: 700; white-space: nowrap; box-shadow: 0 2px 6px rgba(15, 23, 42, 0.14); }
-    .header-google-auth .btn-google-signin:hover { background: #f8f9fa; }
+    .btn-google-signin { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 16px; border-radius: var(--radius-md); background: #ffffff; color: #3c4043; border: 1px solid #dadce0; font-size: var(--text-sm); font-weight: 700; white-space: nowrap; box-shadow: 0 2px 6px rgba(15, 23, 42, 0.14); }
+    .btn-google-signin:hover { background: #f8f9fa; }
     .header-google-auth .header-user-info { display: none; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 8px; background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.34); border-radius: var(--radius-lg); }
     .header-google-auth .auth-status { color: rgba(255,255,255,0.9); font-size: 13px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .header-google-auth .auth-status strong { color: #ffffff; }
@@ -90,6 +90,10 @@
     .stat .label { font-size: var(--text-xs); color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
     .stat .value { margin-top: 0.1rem; font-size: 1.15rem; font-weight: 700; }
     .stat.time-warn   { background: var(--color-gold-highlight); transition: background 0.4s ease; }
+    .practice-entry { display: grid; gap: var(--space-2); justify-items: start; max-width: 38rem; }
+    .practice-entry h2 { margin: 0; font-size: 1.4rem; }
+    .practice-entry .btn-google-signin { min-height: 44px; margin-top: var(--space-2); }
+    .practice-entry #practiceEntryStatus:empty { margin: 0; }
     .stat.time-danger { background: var(--color-error-highlight); transition: background 0.4s ease; }
     .practice-subtitle-row { display: flex; align-items: center; gap: 0; flex-wrap: wrap; }
     .daily-quizzes { font-size: var(--text-sm); color: var(--color-text-muted); font-weight: 700; white-space: nowrap; }
@@ -117,10 +121,11 @@
     }
     .answer-input { text-align: center; font-size: clamp(1.6rem, 4vw, 2.5rem); font-weight: 700; min-height: 64px; }
     .answer-input:disabled { opacity: 0.45; }
-    .feedback-pill { position: absolute; right: 0.6rem; top: 50%; transform: translateY(-50%); border-radius: var(--radius-full); padding: 0.3rem 0.55rem; font-size: var(--text-xs); font-weight: 700; opacity: 0; transition: opacity 150ms; pointer-events: none; }
-    .feedback-pill.show { opacity: 1; transform: translateY(-50%) scale(1.02); }
-    .feedback-pill.good { background: var(--color-success-highlight); color: var(--color-success); }
-    .feedback-pill.bad { background: var(--color-error-highlight); color: var(--color-error); }
+    .feedback-pill { position: absolute; right: 0.6rem; top: 50%; transform: translateY(-50%); border-radius: var(--radius-full); font-size: var(--text-xs); font-weight: 700; pointer-events: none; }
+    .feedback-pill:not(:empty) { padding: 0.3rem 0.55rem; background: var(--color-error-highlight); color: var(--color-text); }
+    .round-result:not(:empty) { margin-top: var(--space-3); padding: var(--space-3); border-radius: var(--radius-md); background: var(--color-surface-offset); color: var(--color-text); font-weight: 700; }
+    .round-result.milestone:not(:empty) { background: var(--color-success-highlight); }
+    #roundStatus:empty { display: none; }
     .keypad { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); }
     .key-btn { padding: 0.75rem 0.4rem; background: var(--color-surface-2); border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent); border-radius: var(--radius-md); font-weight: 700; font-size: 1.05rem; }
     .key-btn:hover { background: var(--color-surface-offset); }
@@ -195,7 +200,7 @@
       white-space: nowrap;
     }
     .new-fact-label.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
-    .cooldown-banner { display: none; text-align: center; padding: var(--space-2) var(--space-3); background: var(--color-error-highlight); color: var(--color-error); border-radius: var(--radius-lg); font-weight: 700; font-size: var(--text-sm); margin-top: var(--space-2); }
+    .cooldown-banner { display: none; text-align: center; padding: var(--space-2) var(--space-3); background: var(--color-error-highlight); color: var(--color-text); border-radius: var(--radius-lg); font-weight: 700; font-size: var(--text-sm); margin-top: var(--space-2); }
     .cooldown-banner.active { display: block; }
     .cooldown-stack .cooldown-banner { margin-top: 0; }
     .cooldown-stack .cooldown-banner.active { margin-bottom: var(--space-2); }
@@ -267,44 +272,38 @@
       margin-bottom: var(--space-3);
     }
     .pg-table {
-      display: grid;
-      grid-template-columns: 32px repeat(11, 22px);
-      grid-auto-rows: 22px;
-      gap: 3px;
-      justify-content: center;
-      align-items: center;
-      padding: 0.75rem 0.55rem;
+      padding: 0.5rem 0.4rem;
       border-radius: var(--radius-lg);
       background: var(--color-surface-2);
       border: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent);
-      overflow-x: auto;
     }
-    .pg-corner {
-      width: 32px;
-      height: 22px;
-    }
-    .pg-top-label,
-    .pg-row-label {
-      display: grid;
-      place-items: center;
-      font-size: 0.62rem;
+    .pg-table table { width: 100%; table-layout: fixed; border-spacing: 2px; }
+    .pg-table th, .pg-table td { padding: 0; text-align: center; }
+    .pg-table th:first-child { width: 3rem; }
+    .pg-table .pg-corner { white-space: normal; }
+    .pg-top-label, .pg-row-label {
+      font-size: 0.65rem;
       font-weight: 850;
-      line-height: 1;
+      line-height: 1.1;
       color: var(--color-text-muted);
       white-space: nowrap;
     }
-    .pg-row-label {
-      justify-content: end;
-      padding-right: 4px;
-    }
+    .pg-axes { margin-bottom: var(--space-2); }
+    .pg-marker { position: absolute; top: 1px; right: 1px; font-size: 0.52rem; line-height: 1; }
+    .pg-legend .pg-marker { position: static; font-size: 0.72rem; }
+    .progress-results { margin-top: var(--space-2); font-size: var(--text-sm); }
+    .progress-results summary { cursor: pointer; padding: var(--space-2) 0; font-weight: 700; }
+    .progress-results table { width: 100%; border-collapse: collapse; font-size: var(--text-xs); }
+    .progress-results th, .progress-results td { padding: 0.35rem 0.15rem; border-bottom: 1px solid var(--color-divider); text-align: start; overflow-wrap: anywhere; }
+    .progress-results td:not(:nth-child(2)) { font-variant-numeric: tabular-nums; }
     .pg-row-label.current-row {
       color: var(--color-primary);
       font-weight: 900;
     }
     .pg-cell {
-      width: 22px;
-      height: 22px;
-      border-radius: 7px;
+      width: 100%;
+      height: 23px;
+      border-radius: 6px;
       display: grid;
       place-items: center;
       position: relative;
@@ -316,26 +315,10 @@
       transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
       white-space: nowrap;
     }
-    .pg-cell:hover {
-      transform: translateY(-1px);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.28), 0 3px 7px rgba(0,0,0,0.12);
-    }
     .pg-cell.fluent,
     .pg-cell.review {
       background: var(--cell-fluent);
       color: var(--color-text-inverse);
-    }
-    .pg-cell.review::after {
-      content: '';
-      position: absolute;
-      right: 3px;
-      top: 3px;
-      width: 5px;
-      height: 5px;
-      border-radius: var(--radius-full);
-      background: var(--cell-learning);
-      border: 1px solid rgba(255,255,255,0.7);
-      box-shadow: 0 1px 2px rgba(0,0,0,0.16);
     }
     .pg-cell.learning {
       background: var(--cell-learning);
@@ -348,7 +331,6 @@
     .pg-cell.locked {
       background: var(--cell-locked);
       color: var(--color-text-muted);
-      opacity: 0.38;
       box-shadow: none;
     }
     .pg-cell.empty {
@@ -357,16 +339,7 @@
     }
     .pg-cell.near-ready {
       background: var(--cell-near-ready);
-      color: var(--color-text-inverse);
-      opacity: 0.82;
-    }
-    .pg-cell.near-ready::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      border-radius: inherit;
-      border: 2px dashed rgba(255,255,255,0.55);
-      pointer-events: none;
+      color: #101b15;
     }
     .pg-cell.current-focus {
       outline: 2px solid var(--color-primary);
@@ -390,30 +363,15 @@
       white-space: nowrap;
     }
     .pg-legend .swatch {
-      width: 12px;
-      height: 12px;
+      width: 15px;
+      height: 15px;
+      display: grid;
+      place-items: center;
       border-radius: 4px;
       flex-shrink: 0;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.22);
+      background: var(--color-surface-offset);
+      color: var(--color-text);
     }
-    .pg-legend .swatch.fl { background: var(--cell-fluent); }
-    .pg-legend .swatch.nr { background: var(--cell-near-ready); position: relative; }
-    .pg-legend .swatch.nr::before { content: ''; position: absolute; inset: 0; border-radius: inherit; border: 1px dashed rgba(255,255,255,0.6); }
-    .pg-legend .swatch.rv { background: var(--cell-fluent); position: relative; }
-    .pg-legend .swatch.rv::after {
-      content: '';
-      position: absolute;
-      right: 1px;
-      top: 1px;
-      width: 4px;
-      height: 4px;
-      border-radius: var(--radius-full);
-      background: var(--cell-learning);
-      border: 1px solid rgba(255,255,255,0.7);
-    }
-    .pg-legend .swatch.ln { background: var(--cell-learning); }
-    .pg-legend .swatch.st { background: var(--cell-struggling); }
-    .pg-legend .swatch.emp { background: var(--cell-empty); }
 
     /* ── Answer glow ── */
     .answer-input {
@@ -653,18 +611,16 @@
     @media (max-width: 820px) {
       .practice-layout { grid-template-columns: 1fr; }
       .pg-panel { order: 10; }
-      .pg-table { grid-template-columns: 30px repeat(11, 21px); grid-auto-rows: 21px; gap: 3px; }
-      .pg-cell { width: 21px; height: 21px; border-radius: 6px; font-size: 0.58rem; }
     }
     @media (max-width: 500px) {
       .app { padding: 0.5rem; gap: var(--space-2); }
-      .header { border-radius: var(--radius-lg); padding: 0.45rem 0.6rem; align-items: center; gap: var(--space-2); }
+      .header { border-radius: var(--radius-lg); padding: 0.45rem 0.6rem; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
       .brand { gap: 0.45rem; align-items: center; }
       .logo { width: 32px; height: 32px; border-radius: var(--radius-full); }
       .header h1 { font-size: 1rem; }
-      .header-actions { flex-wrap: nowrap; justify-content: flex-end; gap: 0.4rem; }
+      .header-actions { flex-wrap: nowrap; justify-content: flex-end; gap: 0.4rem; margin-left: auto; }
       .header-google-auth { flex: 1 1 auto; justify-content: flex-end; min-width: 0; }
-      .header-google-auth .btn-google-signin { padding: 8px 10px; font-size: 0.78rem; }
+      .btn-google-signin { padding: 8px 12px; }
       .header-google-auth .header-user-info { gap: 7px; padding: 5px 7px; flex-wrap: nowrap; min-width: 0; }
       .header-google-auth .auth-status { max-width: 92px; font-size: 12px; }
       .header-google-auth .signed-in-label { display: none; }
@@ -695,8 +651,8 @@
       .row[style*="margin-top:var(--space-3)"] { margin-top: 0.65rem !important; }
       .status-text { padding: 0.55rem 0.65rem; font-size: 0.78rem; }
       .pg-panel { padding: var(--space-2); }
-      .pg-table { grid-template-columns: 27px repeat(11, 20px); grid-auto-rows: 20px; gap: 2px; padding: 0.45rem; }
-      .pg-cell { width: 20px; height: 20px; border-radius: 5px; font-size: 0.54rem; }
+      .pg-table th:first-child { width: 2.3rem; }
+      .pg-cell { height: 22px; font-size: 0.54rem; }
       .pg-top-label, .pg-row-label { font-size: 0.58rem; }
       .pg-legend {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -840,14 +796,16 @@
       margin-bottom: var(--space-2); max-width: none; line-height: 1.5;
     }
     .settings-confirm-box .settings-item { margin-bottom: var(--space-1); }
-    /* ──── Mobile haptics information button ──── */
     .haptics-row {
-      grid-template-columns: 32px minmax(0, 1fr) 24px 18px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 36px;
+      align-items: center;
+      gap: var(--space-1);
     }
 
     .haptics-info-btn {
-      width: 22px;
-      height: 22px;
+      width: 32px;
+      height: 32px;
       border-radius: var(--radius-full);
       display: inline-grid;
       place-items: center;
@@ -865,7 +823,7 @@
       color: var(--color-primary);
       border-color: color-mix(in srgb, var(--color-primary) 40%, transparent);
       background: var(--color-primary-highlight);
-      outline: none;
+      outline: 2px solid var(--color-primary);
     }
 
     /* ──── Speed target slider ──── */
@@ -1086,14 +1044,16 @@
 
   /* Score information modal */
   .info-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.36);
-    display: grid;
-    place-items: center;
-    padding: var(--space-4);
-    z-index: 1200;
+    margin: auto;
+    max-width: calc(100vw - 2rem);
+    max-height: calc(100dvh - 2rem);
+    border: 0;
+    padding: 0;
+    background: transparent;
+    border-radius: var(--radius-xl);
   }
+  .info-overlay:not([open]) { display: none; }
+  .info-overlay::backdrop { background: rgba(0,0,0,0.42); }
   .info-card {
     width: min(92vw, 520px);
     max-height: min(88vh, 680px);
@@ -1222,17 +1182,6 @@
       </div>
       <div class="header-actions">
         <div class="header-google-auth" id="headerGoogleAuth">
-          <div id="headerGoogleSignInBtn">
-            <button type="button" class="btn-google-signin" id="googleSignInBtn" aria-label="Sign in with Google" title="Sign in with Google Drive sync">
-              <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
-                <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"></path>
-                <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"></path>
-                <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"></path>
-                <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"></path>
-              </svg>
-              Sign in with Google
-            </button>
-          </div>
           <div id="headerGoogleUserInfo" class="header-user-info">
             <img id="headerGoogleUserAvatar" src="" width="32" height="32" style="border-radius:50%; display:none;" onerror="this.style.display='none'" alt="">
             <div class="auth-status"><span class="signed-in-label">Signed in as </span><strong id="headerGoogleUserName"></strong></div>
@@ -1248,7 +1197,7 @@
         </div>
 
         <div class="settings-menu-wrap" id="settingsMenuWrap">
-          <button type="button" class="icon-btn" id="settingsBtn" aria-label="Settings" title="Settings">
+          <button type="button" class="icon-btn" id="settingsBtn" aria-label="Settings" title="Settings" aria-controls="settingsDropdown" aria-expanded="false">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="3"/>
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -1302,21 +1251,23 @@
             </button>
 
             <div class="settings-section-label">Mobile</div>
-            <div class="settings-item settings-item-row haptics-row" id="hapticsToggleBtn" role="button" tabindex="0" aria-pressed="true">
-              <span class="settings-icon" aria-hidden="true">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="7" y="2" width="10" height="20" rx="2"></rect>
-                  <path d="M11 18h2"></path><path d="M4 8l-2 2 2 2"></path><path d="M20 8l2 2-2 2"></path>
-                </svg>
-              </span>
-              <span class="settings-text">
-                <span class="settings-title">Haptic Feedback</span>
-                <span class="settings-subtitle" id="hapticsStatusText">On</span>
-              </span>
+            <div class="haptics-row">
+              <button type="button" class="settings-item settings-item-row" id="hapticsToggleBtn" aria-pressed="true">
+                <span class="settings-icon" aria-hidden="true">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="7" y="2" width="10" height="20" rx="2"></rect>
+                    <path d="M11 18h2"></path><path d="M4 8l-2 2 2 2"></path><path d="M20 8l2 2-2 2"></path>
+                  </svg>
+                </span>
+                <span class="settings-text">
+                  <span class="settings-title">Haptic Feedback</span>
+                  <span class="settings-subtitle" id="hapticsStatusText">On</span>
+                </span>
+                <span class="settings-check" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
+                </span>
+              </button>
               <button type="button" class="haptics-info-btn" id="hapticsInfoBtn" aria-label="Haptic feedback information">i</button>
-              <span class="settings-check" aria-hidden="true">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
-              </span>
             </div>
 
             <div class="settings-divider"></div>
@@ -1407,8 +1358,25 @@
       </div>
     </header>
 
-    <!-- ═══ PRACTICE VIEW ═══ -->
-    <section id="practiceView">
+    <!-- Practice view -->
+    <main id="practiceView">
+      <section class="panel practice-entry hidden" id="practiceEntry" aria-labelledby="practiceEntryTitle">
+        <h2 id="practiceEntryTitle">Practice multiplication</h2>
+        <p id="practiceEntryClass"></p>
+        <p class="subtle">Practice multiplication facts in one-minute rounds.</p>
+        <div id="practiceSignIn">
+          <button type="button" class="btn-google-signin" id="googleSignInBtn" aria-label="Sign in with Google" title="Sign in with Google Drive sync">
+            <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+              <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"></path>
+              <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"></path>
+              <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"></path>
+              <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"></path>
+            </svg>
+            Sign in with Google
+          </button>
+        </div>
+        <p id="practiceEntryStatus" role="status" tabindex="-1"></p>
+      </section>
       <!-- Graduation banner -->
       <div class="graduate-banner" id="graduateBanner"></div>
 
@@ -1483,13 +1451,15 @@
             <div class="answer-wrap">
               <label class="sr-only" for="answerInput">Type answer</label>
               <input id="answerInput" class="answer-input" inputmode="none" autocomplete="off" placeholder="?" maxlength="3" readonly disabled />
-              <div class="feedback-pill" id="feedbackPill">Correct</div>
+              <div class="feedback-pill" id="feedbackPill" role="status"></div>
             </div>
             <div class="timeout-overlay" id="timeoutOverlay">
               <div class="answer-reveal" id="timeoutAnswer"></div>
-              <p class="subtle">Type the answer shown to continue</p>
-              <input id="timeoutInput" class="answer-input" inputmode="none" autocomplete="off" placeholder="Type it" maxlength="3" readonly style="max-width:180px;margin:0 auto;" />
+              <p class="subtle" id="timeoutHelp">Type the answer shown to continue.</p>
+              <label class="sr-only" for="timeoutInput">Type the shown answer</label>
+              <input id="timeoutInput" class="answer-input" inputmode="none" autocomplete="off" placeholder="Type it" maxlength="3" aria-describedby="timeoutAnswer timeoutHelp" readonly disabled style="max-width:180px;margin:0 auto;" />
             </div>
+            <div class="sr-only" id="timeoutAnnouncement" role="status"></div>
             <div class="keypad" aria-label="Number keypad" style="margin-top:var(--space-3);">
               <button type="button" class="key-btn" data-key="1">1</button>
               <button type="button" class="key-btn" data-key="2">2</button>
@@ -1501,11 +1471,12 @@
               <button type="button" class="key-btn" data-key="8">8</button>
               <button type="button" class="key-btn" data-key="9">9</button>
               <button type="button" class="key-btn wide" data-key="0">0</button>
-              <button type="button" class="key-btn" data-key="backspace">⌫</button>
+              <button type="button" class="key-btn" data-key="backspace" aria-label="Delete last digit">⌫</button>
             </div>
             <div class="row" style="margin-top:var(--space-3);justify-content:center;">
               <button type="button" class="btn" id="startBtn" disabled>Start Round</button>
             </div>
+            <div class="round-result" id="roundResult" role="status"></div>
             <div class="status-text" id="roundStatus">Press Start when ready.</div>
             <div class="classroom-submit-box hidden" id="classroomSubmitBox" aria-live="polite">
               <div class="classroom-badge" id="classroomBadge"></div>
@@ -1519,30 +1490,33 @@
         <!-- Right: progress grid -->
         <aside class="panel pg-panel" id="progressGridPanel">
           <h2>Your Progress</h2>
-          <div class="pg-table" id="progressGrid"></div>
-          <div class="pg-legend">
-            <span><span class="swatch fl"></span> Mastered</span>
-            <span><span class="swatch rv"></span> Review Soon</span>
-            <span><span class="swatch nr"></span> Almost There</span>
-            <span><span class="swatch ln"></span> Learning</span>
-            <span><span class="swatch st"></span> Needs Practice</span>
-            <span><span class="swatch emp"></span> Not Started</span>
-          </div>
+          <p class="subtle pg-axes">Rows show the times table. Columns show the other factor.</p>
+          <div class="pg-table"><table id="progressGrid"></table></div>
+          <div class="pg-legend" id="progressLegend"></div>
           <div class="progress-graph-wrap">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)"><h3 style="margin-bottom:0">Mastery Over Time</h3><button type="button" id="graphToggleBtn" class="btn-ghost" style="font-size:0.68rem;padding:0.2rem 0.5rem;min-height:auto;border-radius:var(--radius-full);opacity:0.7;letter-spacing:0.03em" title="Toggle between recent and all saved quiz results">Show all results</button></div>
             <div class="progress-graph" id="progressGraph" aria-label="Progress Graph"></div>
+            <details class="progress-results" id="progressResults">
+              <summary>View results as a table</summary>
+              <p class="subtle" id="progressResultsEmpty">Finish a round to see your results.</p>
+              <table id="progressResultsTable" class="hidden">
+                <caption class="sr-only">Multiplication mastery results</caption>
+                <thead><tr><th scope="col">Round</th><th scope="col">Date</th><th scope="col">Score / 100</th><th scope="col">Accuracy</th><th scope="col">Facts/min</th></tr></thead>
+                <tbody id="progressResultsRows"></tbody>
+              </table>
+            </details>
           </div>
         </aside>
       </div>
-    </section>
+    </main>
   </div>
 
 
-  <div class="info-overlay hidden" id="hapticsInfoOverlay" role="dialog" aria-modal="true" aria-labelledby="hapticsInfoTitle">
-    <div class="info-card" role="document">
+  <dialog class="info-overlay" id="hapticsInfoOverlay" aria-labelledby="hapticsInfoTitle">
+    <div class="info-card">
       <div class="info-card-header">
         <h2 id="hapticsInfoTitle">Haptic Feedback</h2>
-        <button type="button" class="info-close-btn" id="hapticsInfoCloseBtn" aria-label="Close information"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+        <button type="button" class="info-close-btn" id="hapticsInfoCloseBtn" autofocus aria-label="Close information"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
       </div>
       <p>When you answer a question, the device briefly vibrates to give feedback. This uses the browser's Vibration API, which is not supported by every mobile browser.</p>
       <ul>
@@ -1555,13 +1529,13 @@
         <button type="button" class="btn" id="hapticsInfoDoneBtn">Got it</button>
       </div>
     </div>
-  </div>
+  </dialog>
 
-  <div class="info-overlay hidden" id="scoreInfoOverlay" role="dialog" aria-modal="true" aria-labelledby="scoreInfoTitle">
-    <div class="info-card" role="document">
+  <dialog class="info-overlay" id="scoreInfoOverlay" aria-labelledby="scoreInfoTitle">
+    <div class="info-card">
       <div class="info-card-header">
         <h2 id="scoreInfoTitle">How the Mastery Score Works</h2>
-        <button type="button" class="info-close-btn" id="scoreInfoCloseBtn" aria-label="Close information"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+        <button type="button" class="info-close-btn" id="scoreInfoCloseBtn" autofocus aria-label="Close information"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
       </div>
       <p>Your score is mostly based on how many multiplication facts you have mastered.</p>
       <ul>
@@ -1579,9 +1553,9 @@
         <button type="button" class="btn" id="scoreInfoDoneBtn">Got it</button>
       </div>
     </div>
-  </div>
+  </dialog>
 
-  <div id="mobileCornerTimer" aria-live="polite" aria-label="Time remaining"></div>
+  <div id="mobileCornerTimer" aria-label="Time remaining"></div>
   <div class="levelup-toast" id="levelupToast" aria-live="polite"></div>
   <div class="graph-tooltip" id="graphTooltip"></div>
   <script src="google-drive-migration.js?v=gmail-20261009-2"></script>
@@ -1752,6 +1726,10 @@
     };
 
     var round = null;
+    var practiceLocked = REQUIRE_SIGN_IN_TO_PRACTICE;
+    var practiceLockMessage = '';
+    var practiceSignInStatus = '';
+    var focusPracticeAfterSignIn = false;
     var roundTimer = null;
     var roundEndsAt = 0;
     var lastProblemKey = null;
@@ -1894,6 +1872,8 @@
       el.feedbackPill = document.getElementById('feedbackPill');
       el.startBtn = document.getElementById('startBtn');
       el.roundStatus = document.getElementById('roundStatus');
+      el.roundResult = document.getElementById('roundResult');
+      el.timeoutAnnouncement = document.getElementById('timeoutAnnouncement');
       el.classroomSubmitBox = document.getElementById('classroomSubmitBox');
       el.classroomBadge = document.getElementById('classroomBadge');
       el.classroomSubmitStatus = document.getElementById('classroomSubmitStatus');
@@ -1907,6 +1887,10 @@
       el.progressGridPanel = document.getElementById('progressGridPanel');
       el.progressGrid = document.getElementById('progressGrid');
       el.progressGraph = document.getElementById('progressGraph');
+      el.progressLegend = document.getElementById('progressLegend');
+      el.progressResultsEmpty = document.getElementById('progressResultsEmpty');
+      el.progressResultsTable = document.getElementById('progressResultsTable');
+      el.progressResultsRows = document.getElementById('progressResultsRows');
       el.streakFill = document.getElementById('streakFill');
       el.streakFlame = document.getElementById('streakFlame');
       el.fpmFill = document.getElementById('fpmFill');
@@ -1915,7 +1899,10 @@
       el.mobileCornerTimer = document.getElementById('mobileCornerTimer');
       el.keyButtons = Array.from(document.querySelectorAll('.key-btn'));
       el.headerGoogleAuth = document.getElementById('headerGoogleAuth');
-      el.headerGoogleSignInWrap = document.getElementById('headerGoogleSignInBtn');
+      el.practiceEntry = document.getElementById('practiceEntry');
+      el.practiceEntryClass = document.getElementById('practiceEntryClass');
+      el.practiceEntryStatus = document.getElementById('practiceEntryStatus');
+      el.practiceSignIn = document.getElementById('practiceSignIn');
       el.headerGoogleUserInfo = document.getElementById('headerGoogleUserInfo');
       el.headerGoogleUserName = document.getElementById('headerGoogleUserName');
       el.headerGoogleUserAvatar = document.getElementById('headerGoogleUserAvatar');
@@ -2967,36 +2954,43 @@
     }
 
     // ═══════════════════════════ PRACTICE LOCK ═══════════════════════════
+    function renderPracticeAvailability() {
+      if (!el.practiceEntry) return;
+      var active = document.activeElement;
+      var hadPracticeFocus = el.practiceLayout.contains(active);
+      var hadEntryFocus = el.practiceEntry.contains(active);
+      var signedIn = syncState.signedIn;
+
+      el.practiceEntry.classList.toggle('hidden', !practiceLocked && (REQUIRE_SIGN_IN_TO_PRACTICE || signedIn));
+      el.practiceLayout.classList.toggle('hidden', practiceLocked);
+      el.practiceSignIn.classList.toggle('hidden', signedIn);
+      el.practiceEntryClass.textContent = classroomState.routeError
+        ? "Class link not recognized. Results won't be sent to a class."
+        : (classroomState.enabled ? 'Class: ' + classroomState.teacherName : 'Personal practice');
+      var message = signedIn ? practiceLockMessage : practiceSignInStatus;
+      if (el.practiceEntryStatus.textContent !== message) el.practiceEntryStatus.textContent = message;
+
+      if (practiceLocked && (hadPracticeFocus || (hadEntryFocus && active === el.googleSignInBtn && signedIn))) {
+        (signedIn ? el.practiceEntryStatus : el.googleSignInBtn).focus();
+      } else if (!practiceLocked && focusPracticeAfterSignIn) {
+        focusPracticeAfterSignIn = false;
+        if (hadEntryFocus || active === document.body) el.startBtn.focus();
+      }
+    }
+
     function setPracticeLocked(locked, message) {
-      var text = message || '';
+      practiceLocked = !!locked;
+      practiceLockMessage = message || '';
 
       if (locked) clearRoundStartCountdown();
-
-      if (el.startBtn) {
-        el.startBtn.disabled = !!locked;
+      if (!locked) el.startBtn.disabled = !!startBtnCooldown || !!round;
+      renderPracticeAvailability();
+      if (locked) {
+        el.startBtn.disabled = true;
+        el.timeoutInput.disabled = true;
       }
-
-      if (el.answerInput) {
-        el.answerInput.disabled = !!locked;
-      }
-
-      if (el.problemText) {
-        el.problemText.textContent = locked ? 'Sign in to start' : 'Ready?';
-      }
-
-      if (el.practiceSubtitle) {
-        el.practiceSubtitle.textContent = locked ? (text || 'Sign in with Google to start.') : 'Ready';
-      }
-
-      if (el.roundStatePill) {
-        el.roundStatePill.textContent = locked ? 'Locked' : 'Ready';
-      }
-
-      if (!locked && el.roundStatus && !round) {
-        setStatus(el.roundStatus, getPrimaryActionStatus(loadProgress()), '');
-      }
-
-      setKeypadEnabled(!locked);
+      el.answerInput.disabled = practiceLocked || !round;
+      setKeypadEnabled(!practiceLocked && !!round);
     }
 
     function setKeypadEnabled(enabled) {
@@ -3037,8 +3031,8 @@
     }
 
     function setGoogleAuthVisibility(isSignedIn) {
-      if (el.headerGoogleSignInWrap) el.headerGoogleSignInWrap.style.display = isSignedIn ? 'none' : '';
       if (el.headerGoogleUserInfo) el.headerGoogleUserInfo.style.display = isSignedIn ? 'flex' : 'none';
+      renderPracticeAvailability();
     }
 
     function setGoogleUserDisplay(info) {
@@ -3191,6 +3185,9 @@
         else text = SHARED_DEVICE_MODE ? 'Sign in to start' : (syncState.signedIn ? 'Saved locally' : 'Not synced');
       }
 
+      if (!syncState.signedIn) {
+        practiceSignInStatus = text === 'Sign in to start' || text === 'Sign in to sync' || text === 'Not synced' ? '' : text;
+      }
       refreshGoogleAuthHeader();
       setDriveSyncDot(status);
 
@@ -3340,6 +3337,7 @@
         setSyncStatus('error', 'Google sync is still loading');
         return;
       }
+      focusPracticeAfterSignIn = document.activeElement === el.googleSignInBtn;
       syncState.permissionRetryAttempted = false;
       setSyncStatus('syncing', 'Opening Google sign-in...');
 
@@ -3897,6 +3895,12 @@
     }
 
     function completeSignOutOfSync() {
+      renderRoundResult(null);
+      hideGraduateBanner();
+      el.correctValue.textContent = '0';
+      el.timeLeftValue.textContent = String(state.settings.durationSec);
+      if (el.timeLeftStat) el.timeLeftStat.classList.remove('time-warn', 'time-danger');
+      focusPracticeAfterSignIn = false;
       var signOutEmail = syncState.googleUser && syncState.googleUser.email;
       if (syncState.saveTimer) { clearTimeout(syncState.saveTimer); syncState.saveTimer = null; }
       if (syncDebounceTimer) { clearTimeout(syncDebounceTimer); syncDebounceTimer = null; }
@@ -6129,69 +6133,50 @@
         }
 
         clearRoundStartCountdown();
-        if (el.startBtn) el.startBtn.disabled = false;
         onDone();
       }, 1000);
     }
 
-    function startRound() {
-      if (roundStartCountdownActive) return;
-      if (!isPracticeAllowed()) {
-        setPracticeLocked(true, 'Sign in with Google to start.');
-        setSyncStatus('local', 'Sign in to start');
-        return;
-      }
+    function startRound(focusAnswer) {
+      if (round || roundStartCountdownActive || practiceLocked || el.startBtn.disabled || !isPracticeAllowed()) return;
 
       ensureFreshTokenBeforeRound().then(function () {
-        if (!isPracticeAllowed()) {
-          setPracticeLocked(true, 'Sign in with Google to start.');
-          setSyncStatus('local', 'Sign in to start');
-          return;
-        }
+        if (practiceLocked || !isPracticeAllowed()) return;
 
         if (syncState.signedIn && navigator.onLine && nowMs() - syncState.lastPullAt > SYNC_BEFORE_ROUND_MAX_AGE_MS) {
           setStatus(el.roundStatus, 'Syncing progress before the round...', 'warn');
           syncNow('before-round').then(function (ok) {
             if (ok === true) {
-              if (!isPracticeAllowed()) { setPracticeLocked(true, 'Sign in with Google to start.'); setSyncStatus('local', 'Sign in to start'); return; }
-              startRoundNow();
+              startRoundNow(focusAnswer);
               return;
             }
             // syncNow returned false — could be deferred or failed. Treat as pending.
             syncState.pendingPush = true;
             setSyncStatus('syncing', 'Sync pending. Progress is saved here.');
             setStatus(el.roundStatus, 'Sync pending. You can practice.', 'warn');
-            if (isPracticeAllowed()) startRoundNow();
+            startRoundNow(focusAnswer);
           }).catch(function (e) {
             var info = markUnsynced('before-round', e);
             if (info.blockPractice) { setPracticeLocked(true, info.message); return; }
             setStatus(el.roundStatus, 'Sync problem. You can practice, but do not sign out yet.', 'warn');
-            if (isPracticeAllowed()) startRoundNow();
+            startRoundNow(focusAnswer);
           });
           return;
         }
 
-        startRoundNow();
+        startRoundNow(focusAnswer);
       }).catch(function () {
-        if (isPracticeAllowed()) startRoundNow();
+        startRoundNow(focusAnswer);
       });
     }
 
-    function startRoundNow() {
-      if (!isPracticeAllowed()) {
-        setPracticeLocked(true, 'Sign in with Google to start.');
-        setSyncStatus('local', 'Sign in to start');
-        return;
-      }
-      runRoundStartCountdown(beginRoundNow);
+    function startRoundNow(focusAnswer) {
+      if (practiceLocked || !isPracticeAllowed()) return;
+      runRoundStartCountdown(function () { beginRoundNow(focusAnswer); });
     }
 
-    function beginRoundNow() {
-      if (!isPracticeAllowed()) {
-        setPracticeLocked(true, 'Sign in with Google to start.');
-        setSyncStatus('local', 'Sign in to start');
-        return;
-      }
+    function beginRoundNow(focusAnswer) {
+      if (practiceLocked || !isPracticeAllowed()) return;
       stopRound(false, 'new-round');
       hideCompletionCelebration();
       stopConfetti();
@@ -6222,12 +6207,12 @@
       hideTimeoutOverlay();
       hideCooldown();
       hideGraduateBanner();
-      if (el.scoreNote) { el.scoreNote.textContent = ''; el.scoreNote.classList.remove('visible'); }
       roundEndsAt = round.startedAt + round.durationSec * 1000;
       el.answerInput.disabled = false;
       el.answerInput.value = '';
       el.timeoutInput.value = '';
       el.timeoutInput.disabled = true;
+      setKeypadEnabled(true);
       el.correctValue.textContent = '0';
       el.streakValue.textContent = '0';
       if (el.currentStreakValue) el.currentStreakValue.textContent = '0';
@@ -6241,6 +6226,10 @@
       setRoundPill('Running');
       setStatus(el.roundStatus, 'Go! Answer as many as you can.', 'good');
       nextProblem(round.progress);
+      var active = document.activeElement;
+      if (round && (focusAnswer || !isProbablyMobile()) && (active === document.body || active === el.startBtn)) {
+        el.answerInput.focus();
+      }
       updateTimer();
       roundTimer = setInterval(updateTimer, 200);
     }
@@ -6250,6 +6239,7 @@
       clearRoundStartCountdown();
       clearPendingAnswerCheck();
       var finalFpm = (save && round) ? getRoundFpm(round) : 0;
+      var finalResult = null;
       var finalProgress = null;
       var classroomSnapshot = null;
       document.body.classList.remove('round-active');
@@ -6258,12 +6248,15 @@
       clearTimeout(timeoutTimer); timeoutTimer = null;
       hideTimeoutOverlay();
       hideCooldown();
+      clearAnswerFeedback();
       el.answerInput.disabled = true;
       el.timeoutInput.disabled = true;
+      setKeypadEnabled(false);
       setRoundPill('Ready');
       updateStreakMeter(0);
       if (save && round) {
-        finalProgress = finalizeRound();
+        finalResult = finalizeRound();
+        finalProgress = finalResult.progress;
         classroomSnapshot = makeClassroomRoundSnapshot(round, finalProgress, {
           endedAt: Date.now(),
           stopReason: reason,
@@ -6283,12 +6276,10 @@
         recordAndSubmitCompletedRound(classroomSnapshot, finalProgress);
       }
       if (el.newFactLabel) { el.newFactLabel.textContent = ''; el.newFactLabel.classList.remove('visible'); }
-      el.problemText.textContent = save ? "Time’s up!" : 'Ready?';
-      var syncResult = syncCompletionUi(finalProgress, { celebrate: !finalCelebrationShown });
-      console.log('[confetti] stopRound syncCompletionUi result: completed=' + syncResult + ' celebrate=' + !finalCelebrationShown + ' finalCelebrationShown=' + finalCelebrationShown);
-      if (!syncResult) {
-        setStatus(el.roundStatus, 'Round finished. Start another!', '');
-      }
+      el.problemText.textContent = finalResult ? '' : 'Ready?';
+      setStatus(el.roundStatus, finalResult ? '' : getPrimaryActionStatus(loadProgress()), '');
+      renderRoundResult(finalResult);
+      syncCompletionUi(finalProgress, { celebrate: !finalCelebrationShown });
       renderProgressGrid(finalProgress);
       renderProgressGraph(finalProgress);
       updatePracticeHeader(finalProgress);
@@ -6321,8 +6312,10 @@
     }
 
     function nextProblem(progress) {
+      var restoreAnswerFocus = answerFlowHasFocus();
       progress = progress || (round && round.progress) || loadProgress();
       clearPendingAnswerCheck();
+      clearAnswerFeedback();
       clearTimeout(timeoutTimer);
       hideTimeoutOverlay();
       hideCooldown();
@@ -6368,7 +6361,7 @@
       el.problemText.textContent = p.left + ' \u00d7 ' + p.right;
       el.answerInput.value = '';
       el.answerInput.disabled = false;
-      focusIfDesktop(el.answerInput);
+      if (restoreAnswerFocus) el.answerInput.focus();
       el.timeoutInput.value = '';
       el.timeoutInput.disabled = true;
 
@@ -6400,12 +6393,18 @@
       round.progressDirty = true;
       schedulePostQuestionWork(round.progress);
       var answer = round.currentProblem.answer;
+      var moveFocus = answerFlowHasFocus();
+      clearAnswerFeedback();
       el.timeoutAnswer.textContent = round.currentProblem.left + ' \u00d7 ' + round.currentProblem.right + ' = ' + answer;
       buzz([50, 30, 50]);
       el.timeoutOverlay.classList.add('active');
       el.timeoutInput.disabled = false;
       el.timeoutInput.value = '';
-      focusIfDesktop(el.timeoutInput);
+      if (moveFocus) {
+        el.timeoutInput.focus();
+      } else {
+        el.timeoutAnnouncement.textContent = el.timeoutAnswer.textContent + '. Type the answer shown to continue.';
+      }
       el.answerInput.disabled = true;
     }
 
@@ -6423,7 +6422,6 @@
           if (el.currentStreakValue) el.currentStreakValue.textContent = '0';
           updateStreakMeter(0);
         }
-        hideTimeoutOverlay();
         var progress = round.progress || loadProgress();
         nextProblem(progress);
         schedulePostQuestionWork(progress);
@@ -6555,6 +6553,7 @@
         buzz([35, 30, 35]);
         flashGlow('bad');
         el.answerInput.value = '';
+        el.feedbackPill.textContent = 'Try again';
       }
     }
 
@@ -6562,7 +6561,7 @@
       cooldownUntil = 0;
       cooldownFactKey = null;  // Bug M1 fix
       hideCooldown();
-      if (round) { el.answerInput.disabled = false; focusIfDesktop(el.answerInput); }
+      if (round) el.answerInput.disabled = practiceLocked;
     }
 
     function finalizeRound() {
@@ -6572,7 +6571,6 @@
       var prevAccuracy = round ? (round.correct / Math.max(1, round.attempted)) : 0;
       var prevFpm = round ? Math.round(getRoundFpm(round) * 10) / 10 : 0;
       var prevScore = calculateOverallMasteryScore(prevBreakdown.fluent, prevBreakdown.inProgress, prevAccuracy, prevFpm);
-      var model = getActiveModel(progress);
       var graduated = checkGraduation(progress);
       var msg;
       var todayKey = getLocalDateKey();
@@ -6589,7 +6587,7 @@
       updateTotalQuizDisplay(progress);
       updateBestSpeedDisplay(progress);
 
-      msg = 'Done! ' + round.correct + ' correct. ';
+      msg = round.correct + ' correct.';
       if (graduated) {
         var oldTable = progress.currentTable;
         var newTable;
@@ -6597,15 +6595,13 @@
         graduate(progress, { deferSave: true });
         round.graduated = true;
         newTable = progress.currentTable;
-        model = getActiveModel(progress);
 
-        msg += 'You graduated to \u00d7' + newTable + '! ';
         el.graduateBanner.textContent = 'You mastered \u00d7' + oldTable + '! Now working on \u00d7' + newTable + '.';
         el.graduateBanner.classList.add('active');
 
         celebrateVerticalStageAdvance(oldTable, newTable, progress);
       }
-      msg += 'Active through \u00d7' + model.maxSecond + '.';
+      if (round.graduated) msg += ' You unlocked the ' + progress.currentTable + ' times table!';
       var newBreakdown = getMasteryBreakdown(progress);
       var newScore = calculateOverallMasteryScore(newBreakdown.fluent, newBreakdown.inProgress, prevAccuracy, prevFpm);
       var completedAllFacts = hasCompletedAllFacts(progress, newScore);
@@ -6615,11 +6611,9 @@
         progress.hasReachedLevel100 = true;
         msg = 'Amazing! You mastered all multiplication facts from x2 to x12! Your FactFlow mastery score is 100.';
       }
-      setStatus(el.roundStatus, msg, (graduated || completedAllFacts) ? 'good' : '');
       if (el.scoreNote) {
         if (completedAllFacts) {
-          // Avoid showing a duplicate dark score note at final mastery.
-          // The green round status message already gives the Level 100 celebration.
+          // The round result already describes full mastery.
           el.scoreNote.textContent = '';
           el.scoreNote.classList.remove('visible');
         } else {
@@ -6630,15 +6624,20 @@
 
       saveProgressToStorage(progress, { reason: 'round-complete', flushNow: true });
 
-      renderProgressGrid(progress);
-      renderProgressGraph(progress);
-      updatePracticeHeader(progress);
-
       if (syncState.signedIn) {
         queueDrivePush('round-complete', true);
       }
 
-      return progress;
+      return { progress: progress, message: msg, milestone: round.graduated || completedAllFacts };
+    }
+
+    function renderRoundResult(result) {
+      el.roundResult.classList.toggle('milestone', !!(result && result.milestone));
+      el.roundResult.textContent = result ? result.message : '';
+      if (!result && el.scoreNote) {
+        el.scoreNote.textContent = '';
+        el.scoreNote.classList.remove('visible');
+      }
     }
 
 
@@ -6762,9 +6761,10 @@
     }
 
     function handleKeypad(key) {
-      if (!isPracticeAllowed()) return;
+      if (!round || practiceLocked || !isPracticeAllowed()) return;
       var input = el.timeoutOverlay.classList.contains('active') ? el.timeoutInput : el.answerInput;
       if (input.disabled) return;
+      clearAnswerFeedback();
       if (key === 'backspace') {
         if (input === el.answerInput) clearPendingAnswerCheck();
         input.value = input.value.slice(0, -1);
@@ -6775,7 +6775,7 @@
       }
       if (input === el.timeoutInput) handleTimeoutInput();
       else queueAnswerInputCheck();
-      focusIfDesktop(input);
+      if (!input.disabled && answerFlowHasFocus() && document.activeElement !== input) input.focus();
     }
 
 
@@ -7466,8 +7466,8 @@
           masteryScore: clamp(ms, 0, 100),
           currentTable: item.currentTable || STARTING_TABLE,
           date: getSessionDateValue(item),
-          accuracy: item.accuracy || null,
-          fpm: item.fpm || null,
+          accuracy: item.accuracy == null ? null : item.accuracy,
+          fpm: item.fpm == null ? null : item.fpm,
           levelsPassed: lp,
           inProgressCount: ip
         });
@@ -7627,83 +7627,106 @@
         ? 'All saved results - score is out of 100 - speed target: ' + chartTarget + ' facts/min'
         : 'Recent ' + GRAPH_DEFAULT_VISIBLE_RESULTS + ' quiz results - score is out of 100 - speed target: ' + chartTarget + ' facts/min';
       el.progressGraph.innerHTML = scoreCardHtml + svg + '<div class="mastery-chart-note">' + chartNote + '</div>';
+      renderProgressResults(visiblePoints);
+    }
+
+    function renderProgressResults(points) {
+      var rows = el.progressResultsRows;
+      rows.textContent = '';
+      el.progressResultsEmpty.classList.toggle('hidden', points.length > 0);
+      el.progressResultsTable.classList.toggle('hidden', points.length === 0);
+      var fragment = document.createDocumentFragment();
+      points.forEach(function (point) {
+        var row = document.createElement('tr');
+        var date = point.date ? new Date(point.date) : null;
+        [
+          point.session,
+          date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString() : 'Unavailable',
+          point.masteryScore,
+          point.accuracy == null ? 'Unavailable' : point.accuracy + '%',
+          point.fpm == null ? 'Unavailable' : point.fpm
+        ].forEach(function (value, index) {
+          var cell = document.createElement(index === 0 ? 'th' : 'td');
+          if (index === 0) cell.scope = 'row';
+          cell.textContent = value;
+          row.appendChild(cell);
+        });
+        fragment.appendChild(row);
+      });
+      rows.appendChild(fragment);
     }
 
     // v28: makeTicks() removed (was unused dead code)
     // ═══════════════════════════ PROGRESS GRID ═══════════════════════════
+    var GRID_STATUS = {
+      fluent: ['Mastered', '+'],
+      review: ['Review soon', '*'],
+      'near-ready': ['Almost there', '~'],
+      learning: ['Learning', '.'],
+      struggling: ['Needs practice', '!'],
+      empty: ['Not started', '-'],
+      locked: ['Locked', 'x']
+    };
+
     function renderProgressGrid(progress) {
       progress = progress || (round && round.progress) || loadProgress();
       var currentTable = progress.currentTable;
-      var model = getActiveModel(progress);
-      var activeMax = model.maxSecond;
-      var html = '';
+      var activeMax = getActiveModel(progress).maxSecond;
+      var html = '<caption class="sr-only">Multiplication fact mastery by times table and factor</caption>' +
+        '<thead><tr><th class="pg-top-label pg-corner" scope="col">Table</th>';
 
-      html += '<span class="pg-corner" aria-hidden="true"></span>';
       for (var h = 2; h <= 12; h++) {
-        html += '<span class="pg-top-label">' + h + '</span>';
+        html += '<th scope="col" class="pg-top-label"><span class="sr-only">Factor </span>' + h + '</th>';
       }
+      html += '</tr></thead><tbody>';
 
       for (var t = STARTING_TABLE; t <= MAX_TABLE; t++) {
         var isCurrentRow = t === currentTable;
-        html += '<span class="pg-row-label' + (isCurrentRow ? ' current-row' : '') + '">x' + t + '</span>';
+        html += '<tr><th scope="row" class="pg-row-label' + (isCurrentRow ? ' current-row' : '') + '">x' + t + '</th>';
 
         for (var s = 2; s <= 12; s++) {
-          var cls = '';
-          var title = t + 'x' + s;
+          var status = 'locked';
+          var currentFact = isCurrentRow && s <= activeMax;
 
-          if (isCurrentRow) cls += ' current-row';
-
-          if (t > currentTable) {
-            cls += ' locked';
-          } else if (t === currentTable && s > activeMax) {
-            // Only lock if never seen - a fact seen before must never revert to locked
-            var preStats = getFactStats(t, s, progress);
-            if (preStats.shown > 0) {
-              var status2 = getFactDisplayStatus(preStats, state.settings.adaptive);
-              if (status2 === 'empty') status2 = 'learning';
-              cls += ' ' + status2;
-            } else {
-              cls += ' locked';
-            }
-          } else {
+          if (t <= currentTable) {
             var stats = getFactStats(t, s, progress);
-            var displayStatus;
-            if (t === currentTable && s <= activeMax) cls += ' current-focus';
-            displayStatus = getFactDisplayStatus(stats, state.settings.adaptive);
-
-            // Past rows should not show unexplained pale cells. If old saved
-            // progress skipped a fact, show it as locked until catch-up practice
-            // gives it real practice data.
-            if (t < currentTable && displayStatus === 'empty') {
-              cls += ' locked';
-            } else {
-              cls += ' ' + displayStatus;
+            if (currentFact || stats.shown > 0) {
+              status = getFactDisplayStatus(stats, state.settings.adaptive);
+              if (!currentFact && status === 'empty') status = isCurrentRow ? 'learning' : 'locked';
             }
           }
 
-          html += '<span class="pg-cell' + cls + '" title="' + title + '" aria-label="' + title + '">' + s + '</span>';
+          var label = GRID_STATUS[status];
+          var title = t + ' \u00d7 ' + s + ' = ' + (t * s);
+          var readable = t + ' times ' + s + ' equals ' + (t * s) + '. ' + label[0];
+          html += '<td><span class="pg-cell ' + status + (currentFact ? ' current-focus' : '') + '" title="' + title + ' - ' + label[0] + '">' +
+            '<span class="sr-only">' + readable + '</span><span aria-hidden="true">' + s +
+            '<span class="pg-marker">' + label[1] + '</span></span></span></td>';
         }
+        html += '</tr>';
       }
 
-      el.progressGrid.innerHTML = html;
+      el.progressGrid.innerHTML = html + '</tbody>';
+      if (el.progressLegend && !el.progressLegend.childElementCount) {
+        el.progressLegend.innerHTML = Object.keys(GRID_STATUS).map(function (status) {
+          var label = GRID_STATUS[status];
+          return '<span><span class="swatch" aria-hidden="true"><span class="pg-marker">' + label[1] + '</span></span>' + label[0] + '</span>';
+        }).join('');
+      }
     }
 
     // ═══════════════════════════ UI ═══════════════════════════
     function updatePracticeHeader(progress) {
       progress = progress || (round && round.progress) || loadProgress();
       var model = getActiveModel(progress);
-      el.practiceTitle.textContent = '×' + progress.currentTable + ' Tables';
+      el.practiceTitle.textContent = 'Practicing the ' + progress.currentTable + ' times table';
       el.practiceSubtitle.textContent = model.activeFacts.length + ' facts active through \u00d7' + model.maxSecond;
     }
 
     function renderAuthUI() {
-      var locked = SHARED_DEVICE_MODE && !isGooglePracticeSession();
-      var uiProgress;
+      var uiProgress = loadProgress();
 
-      el.practiceLayout.classList.remove('hidden');
-      uiProgress = loadProgress();
-
-      setStatus(el.roundStatus, locked ? 'Sign in with Google to start.' : getPrimaryActionStatus(uiProgress), '');
+      setStatus(el.roundStatus, getPrimaryActionStatus(uiProgress), '');
       updatePracticeHeader(uiProgress);
       renderProgressGrid(uiProgress);
       renderProgressGraph(uiProgress);
@@ -7720,11 +7743,7 @@
 
       syncCompletionUi(uiProgress);
 
-      if (locked) {
-        setPracticeLocked(true, 'Sign in with Google to start.');
-      } else {
-        setPracticeLocked(false);
-      }
+      setPracticeLocked(practiceLocked || !isPracticeAllowed(), practiceLockMessage);
       updateClassroomSubmitUi();
     }
 
@@ -7822,10 +7841,9 @@
       updateFpmMeter(fpm);
     }
 
-    function focusIfDesktop(node) {
-      if (!node) return;
-      var isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0);
-      if (!isTouch) node.focus();
+    function answerFlowHasFocus() {
+      var active = document.activeElement;
+      return active === el.answerInput || active === el.timeoutInput || el.keyButtons.indexOf(active) >= 0;
     }
 
     var FIXED_BAR_GRADIENT = 'linear-gradient(90deg, #2d8cff 0%, #f2d23b 35%, #f28c28 65%, #d72626 100%)';
@@ -7868,11 +7886,9 @@
         if (remaining <= 0) {
           clearInterval(startBtnCooldown);
           startBtnCooldown = null;
-          el.startBtn.disabled = false;
+          el.startBtn.disabled = practiceLocked;
           el.startBtn.textContent = getPrimaryActionLabel(loadProgress());
-          if (el.problemText && el.problemText.textContent === "Time’s up!") {
-            el.problemText.textContent = 'Ready?';
-          }
+          if (!round && !el.problemText.textContent) el.problemText.textContent = 'Ready?';
         } else {
           el.startBtn.textContent = 'Wait ' + remaining + '...';
         }
@@ -7895,7 +7911,13 @@
     }
 
     function hideFeedback() { el.answerInput.classList.remove('glow-good', 'glow-bad'); }
-    function hideTimeoutOverlay() { el.timeoutOverlay.classList.remove('active'); el.timeoutInput.disabled = true; el.timeoutInput.value = ''; }
+    function clearAnswerFeedback() { el.feedbackPill.textContent = ''; }
+    function hideTimeoutOverlay() {
+      el.timeoutOverlay.classList.remove('active');
+      el.timeoutInput.disabled = true;
+      el.timeoutInput.value = '';
+      el.timeoutAnnouncement.textContent = '';
+    }
     function hideCooldown() {
       if (cooldownHideTimer) { clearTimeout(cooldownHideTimer); cooldownHideTimer = null; }
       if (el.cooldownBanner) el.cooldownBanner.classList.remove('active');
@@ -8082,30 +8104,22 @@
 
     function closeSettingsMenu() {
       if (el.settingsDropdown) el.settingsDropdown.classList.remove('open');
+      if (el.settingsBtn) el.settingsBtn.setAttribute('aria-expanded', 'false');
       if (el.resetNormal) el.resetNormal.style.display = '';
       if (el.resetConfirm) el.resetConfirm.style.display = 'none';
     }
 
-
-    // ═══════════════════════════ SCORE INFO PANEL ═══════════════════════════
-    function openScoreInfo() {
-      if (!el.scoreInfoOverlay) return;
-      el.scoreInfoOverlay.classList.remove('hidden');
-      if (el.scoreInfoCloseBtn) el.scoreInfoCloseBtn.focus();
-    }
-
-    function closeScoreInfo() {
-      if (el.scoreInfoOverlay) el.scoreInfoOverlay.classList.add('hidden');
-    }
-
-    function openHapticsInfo() {
-      if (!el.hapticsInfoOverlay) return;
-      el.hapticsInfoOverlay.classList.remove('hidden');
-      if (el.hapticsInfoCloseBtn) el.hapticsInfoCloseBtn.focus();
-    }
-
-    function closeHapticsInfo() {
-      if (el.hapticsInfoOverlay) el.hapticsInfoOverlay.classList.add('hidden');
+    function bindInfoDialog(dialog, closeButton, doneButton, openerId, fallback) {
+      function close() { dialog.close(); }
+      closeButton.addEventListener('click', close);
+      doneButton.addEventListener('click', close);
+      dialog.addEventListener('click', function (event) {
+        if (event.target === dialog) close();
+      });
+      dialog.addEventListener('close', function () {
+        var opener = document.getElementById(openerId);
+        (opener && opener.getClientRects().length ? opener : fallback).focus();
+      });
     }
 
     // ═══════════════════════════ EVENTS ═══════════════════════════
@@ -8119,33 +8133,9 @@
       if (el.themeSystemBtn) {
         el.themeSystemBtn.addEventListener('click', function () { setThemePref('system'); closeSettingsMenu(); });
       }
-      if (el.hapticsInfoBtn) {
-        el.hapticsInfoBtn.addEventListener('click', function (e) {
-          e.stopPropagation();
-          openHapticsInfo();
-        });
-      }
-      if (el.hapticsInfoCloseBtn) el.hapticsInfoCloseBtn.addEventListener('click', closeHapticsInfo);
-      if (el.hapticsInfoDoneBtn)  el.hapticsInfoDoneBtn.addEventListener('click', closeHapticsInfo);
-      if (el.hapticsInfoOverlay) {
-        el.hapticsInfoOverlay.addEventListener('click', function (e) {
-          if (e.target === el.hapticsInfoOverlay) closeHapticsInfo();
-        });
-      }
-      if (el.hapticsToggleBtn) {
-        el.hapticsToggleBtn.addEventListener('click', function (e) {
-          e.stopPropagation();
-          setHapticsEnabled(!getHapticsEnabled());
-        });
-        el.hapticsToggleBtn.addEventListener('keydown', function (e) {
-          if (e.target !== el.hapticsToggleBtn) return;
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            e.stopPropagation();
-            setHapticsEnabled(!getHapticsEnabled());
-          }
-        });
-      }
+      el.hapticsInfoBtn.addEventListener('click', function () { el.hapticsInfoOverlay.showModal(); });
+      bindInfoDialog(el.hapticsInfoOverlay, el.hapticsInfoCloseBtn, el.hapticsInfoDoneBtn, 'hapticsInfoBtn', el.settingsBtn);
+      el.hapticsToggleBtn.addEventListener('click', function () { setHapticsEnabled(!getHapticsEnabled()); });
       if (el.speedTargetSlider) {
         el.speedTargetSlider.addEventListener('click', function (e) {
           e.stopPropagation();
@@ -8162,24 +8152,16 @@
         });
       }
       document.addEventListener('click', function (e) {
-        if (e.target && e.target.id === 'masteryInfoBtn') {
-          e.preventDefault();
-          openScoreInfo();
-        }
+        if (e.target && e.target.id === 'masteryInfoBtn') el.scoreInfoOverlay.showModal();
       });
-      if (el.scoreInfoCloseBtn) el.scoreInfoCloseBtn.addEventListener('click', closeScoreInfo);
-      if (el.scoreInfoDoneBtn) el.scoreInfoDoneBtn.addEventListener('click', closeScoreInfo);
-      if (el.scoreInfoOverlay) {
-        el.scoreInfoOverlay.addEventListener('click', function (e) {
-          if (e.target === el.scoreInfoOverlay) closeScoreInfo();
-        });
-      }
+      bindInfoDialog(el.scoreInfoOverlay, el.scoreInfoCloseBtn, el.scoreInfoDoneBtn, 'masteryInfoBtn', document.getElementById('graphToggleBtn'));
 
       // ── Settings menu ──
       if (el.settingsBtn) {
         el.settingsBtn.addEventListener('click', function (e) {
           e.stopPropagation();
           var open = el.settingsDropdown.classList.toggle('open');
+          el.settingsBtn.setAttribute('aria-expanded', String(open));
           if (open) {
             updateHapticsMenuText();
             syncSpeedTargetSlider();
@@ -8189,10 +8171,9 @@
         });
       }
       document.addEventListener('click', function (e) {
-        if (el.settingsDropdown && el.settingsDropdown.classList.contains('open')) {
-          if (!el.settingsMenuWrap || !el.settingsMenuWrap.contains(e.target)) {
-            closeSettingsMenu();
-          }
+        if (el.settingsDropdown.classList.contains('open') && !el.hapticsInfoOverlay.open && !el.scoreInfoOverlay.open &&
+            !e.target.closest('dialog') && !el.settingsMenuWrap.contains(e.target)) {
+          closeSettingsMenu();
         }
       });
       if (el.settingsResetBtn) {
@@ -8245,27 +8226,33 @@
       if (el.classroomRetryBtn) {
         el.classroomRetryBtn.addEventListener('click', retryLastClassroomSubmit);
       }
-      el.startBtn.addEventListener('click', startRound);
-      el.answerInput.addEventListener('input', queueAnswerInputCheck);
+      el.startBtn.addEventListener('click', function (event) {
+        startRound(event.detail === 0 || event.pointerType === 'mouse');
+      });
+      el.answerInput.addEventListener('input', function () {
+        clearAnswerFeedback();
+        queueAnswerInputCheck();
+      });
       el.timeoutInput.addEventListener('input', handleTimeoutInput);
       el.keyButtons.forEach(function (btn) {
         btn.addEventListener('click', function () { handleKeypad(btn.dataset.key); });
       });
       document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape' && el.scoreInfoOverlay && !el.scoreInfoOverlay.classList.contains('hidden')) {
-          closeScoreInfo();
+        if (el.scoreInfoOverlay.open || el.hapticsInfoOverlay.open) return;
+        if (e.key === 'Escape' && el.settingsDropdown.classList.contains('open')) {
+          e.preventDefault();
+          closeSettingsMenu();
+          el.settingsBtn.focus();
           return;
         }
-        if (e.key >= '0' && e.key <= '9') {
-          if (document.activeElement === el.answerInput || document.activeElement === el.timeoutInput) e.preventDefault();
-          handleKeypad(e.key);
-        } else if (e.key === 'Backspace') {
-          if (document.activeElement === el.answerInput || document.activeElement === el.timeoutInput) e.preventDefault();
-          handleKeypad('backspace');
-        } else if (e.key === 'Enter') {
-          if (document.activeElement === el.answerInput) handleAnswerInput();
-          else if (document.activeElement === el.timeoutInput) handleTimeoutInput();
-          else if (!round && !el.startBtn.disabled) startRound();
+        if (!round || practiceLocked || e.isComposing || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || !answerFlowHasFocus()) return;
+        if ((e.key >= '0' && e.key <= '9') || e.key === 'Backspace') {
+          e.preventDefault();
+          handleKeypad(e.key === 'Backspace' ? 'backspace' : e.key);
+        } else if (e.key === 'Enter' && document.activeElement === el.answerInput) {
+          handleAnswerInput();
+        } else if (e.key === 'Enter' && document.activeElement === el.timeoutInput) {
+          handleTimeoutInput();
         }
       });
     }
